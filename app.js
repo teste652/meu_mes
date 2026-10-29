@@ -81,9 +81,9 @@ function itemDaMeta(t,id){const p=planoMeta(t),r=+t.taxa||0;
 // o salário é de cada mês (salarios: {'2026-10':1000}); 'comeco' é o primeiro mês do histórico
 const EXEMPLO=()=>{const c=(id,nome,valor)=>({id,nome,valor,cat:'contas'}),
   meta={id:'t1',nome:'Reserva de emergência',valor:5000,mensal:300,ja:1200,inicio:MES_ATUAL};
-  return {exemplo:true,salarios:{[MES_ATUAL]:3500},comeco:MES_ATUAL,metas:[meta],
+  return {exemplo:true,salarios:{[MES_ATUAL]:3500},ajustes:{},comeco:MES_ATUAL,metas:[meta],
   fixos:[c('e1','Aluguel',950),c('e2','Luz',160),c('e3','Água',85),c('e4','Internet',100),{id:'e5',nome:'Passe de ônibus',valor:220,cat:'transporte'},{id:'e6',nome:'Mercado',valor:600,cat:'comida'},{id:'e7',nome:'Tênis novo',valor:70,cat:'compras',parcelas:4,inicio:MES_ATUAL},itemDaMeta(meta,'e8')]}};
-const VAZIO=()=>({exemplo:false,salarios:{},comeco:MES_ATUAL,fixos:[],metas:[]});
+const VAZIO=()=>({exemplo:false,salarios:{},ajustes:{},comeco:MES_ATUAL,fixos:[],metas:[]});
 let S=EXEMPLO();
 const todoMes=f=>!f.mes&&!(f.parcelas&&f.inicio);
 // gasto parcelado só conta nos meses das parcelas. Qualquer gasto pode valer só 'desde' um mês e 'ate' outro:
@@ -102,8 +102,10 @@ function acabou(f,agora=idxMes(Y0,M0)){const ate=ymParse(f.ate);if(ate&&idxMes(a
 function congelado(f){if(f.criado&&f.criado>=MES_ATUAL)return false;
   const c=ymParse(S.comeco);for(let k=c?idxMes(c.y,c.m):idxMes(Y0,M0);k<idxMes(Y0,M0);k++)if(ativo(f,Math.floor(k/12),k%12))return true;
   return false}
-// o salário de cada mês: o mês que já tem o seu usa ele; os próximos seguem o último que tiver
-function salarioDe(y,m,s=S){const k=ym(y,m);let v=0,q='';for(const [c,x] of Object.entries(s.salarios))if(c<=k&&c>q){q=c;v=x}return v}
+// o salário de cada mês: o mês que já tem o seu usa ele; os próximos seguem o último que tiver.
+// Um mês também pode ter um salário só dele ('ajustes': um 13º, um mês com menos), que não passa pros outros
+function baseDe(y,m,s=S){const k=ym(y,m);let v=0,q='';for(const [c,x] of Object.entries(s.salarios))if(c<=k&&c>q){q=c;v=x}return v}
+function salarioDe(y,m,s=S){const k=ym(y,m);return s.ajustes&&k in s.ajustes?s.ajustes[k]:baseDe(y,m,s)}
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // embaixo do nome: a área e, no parcelado, em que parcela está
 function subInfo(x){let t=CAT[x.cat].n;
@@ -279,26 +281,26 @@ function ler(d){if(!d||typeof d!=='object'||typeof d.salario!=='number'||!isFini
   const ids=new Set(), fixos=d.fixos.map(x=>gastoValido(x,ids)).filter(Boolean), sims=Array.isArray(d.sims)?d.sims:[];
   sims.filter(x=>x&&(!x.mes||x.mes===MES_ATUAL)).forEach(x=>{const g=gastoValido({id:x.id,nome:x.nome,valor:x.valor,cat:x.cat,mes:MES_ATUAL},ids);if(g)fixos.push(g)});
   const vistas=new Set(), metas=(Array.isArray(d.metas)?d.metas:[]).map(metaValida).filter(t=>t&&!vistas.has(t.id)&&vistas.add(t.id)).slice(0,3);
-  const tem=d.salarios&&typeof d.salarios==='object', salarios={};
-  if(tem)Object.keys(d.salarios).forEach(k=>{const v=num(d.salarios[k]);if(ehMes(k)&&v>=0&&isFinite(v))salarios[k]=v});
+  const porMes=o=>{const r={};if(o&&typeof o==='object')Object.keys(o).forEach(k=>{const v=num(o[k]);if(ehMes(k)&&v>=0&&isFinite(v))r[k]=v});return r};
+  const tem=d.salarios&&typeof d.salarios==='object', salarios=porMes(d.salarios), ajustes=porMes(d.ajustes);
   const comeco=ehMes(d.comeco)?d.comeco:tem?MES_ATUAL:MES_ANTERIOR>'2026-10'?MES_ANTERIOR:'2026-10';
   if(!tem&&d.salario>0)salarios[comeco]=d.salario;
-  const n={exemplo:false,salarios,comeco,fixos,metas,...(ehMes(d.lembrete)?{lembrete:d.lembrete}:{}),...(ehMes(d.aviso)?{aviso:d.aviso}:{})};
+  const n={exemplo:false,salarios,ajustes,comeco,fixos,metas,...(ehMes(d.lembrete)?{lembrete:d.lembrete}:{}),...(ehMes(d.aviso)?{aviso:d.aviso}:{})};
   virar(n);return n}
 // o mês virou desde a última vez que o app abriu: os meses que passaram sem abrir ficam com o último salário,
-// e o deste mês também, até a pessoa dizer se continua
+// e o deste mês também, até a pessoa dizer se continua (se ela já tinha posto o salário deste mês, não pergunta)
 function virar(s){const ks=Object.keys(s.salarios).sort(), u=ks[ks.length-1];if(!u||u>=MES_ATUAL)return;
   const v=s.salarios[u], i=ymParse(u), hoje=idxMes(Y0,M0);
   for(let k=Math.max(idxMes(i.y,i.m)+1,hoje-120);k<=hoje;k++)s.salarios[ym(Math.floor(k/12),k%12)]=v;
-  if(v>0)s.aviso=MES_ATUAL}
+  if(v>0&&!(MES_ATUAL in s.ajustes))s.aviso=MES_ATUAL}
 // o histórico passa a começar em 'corte': o que é de antes sai (o salário desses meses e o gasto que já tinha acabado).
 // O histórico guarda só o ano passado e o atual: na virada do ano um aviso diz o que vai sair, e sai no Entendi
 function aparar(s,corte){if(!(s.comeco<corte))return;
-  const c=ymParse(corte);if(!(corte in s.salarios))s.salarios[corte]=salarioDe(c.y,c.m,s);
-  Object.keys(s.salarios).forEach(k=>{if(k<corte)delete s.salarios[k]});
+  const c=ymParse(corte);if(!(corte in s.salarios))s.salarios[corte]=baseDe(c.y,c.m,s);
+  [s.salarios,s.ajustes].forEach(o=>Object.keys(o).forEach(k=>{if(k<corte)delete o[k]}));
   s.fixos=s.fixos.filter(f=>!acabou(f,idxMes(c.y,c.m)));s.comeco=corte}
 function load(d){const n=ler(d);if(!n)return false;S=n;
-  migrou=!d.exemplo&&(Array.isArray(d.sims)&&d.sims.length>0||!d.salarios||n.aviso!==d.aviso||n.comeco!==d.comeco);return true}
+  migrou=!d.exemplo&&(Array.isArray(d.sims)&&d.sims.length>0||!d.salarios||n.aviso!==d.aviso||n.comeco!==d.comeco||Object.keys(n.salarios).length!==Object.keys(d.salarios).length);return true}
 try{load(JSON.parse(localStorage.getItem('meu-mes')||'null'))}catch(e){}
 $('#saveTxt').textContent=SALVO;
 render();
@@ -502,14 +504,16 @@ $('#gDel').onclick=()=>{const ed=editando, i=ed?S.fixos.findIndex(x=>x.id===ed.i
 let salMes=MES_ATUAL;
 function openSal(k=MES_ATUAL){salMes=k;const p=ymParse(k), v=salarioDe(p.y,p.m), atual=k===MES_ATUAL;
   $('#sTitle').textContent=atual?'Seu salário':`Salário de ${mesNome(p.y,p.m)}`;
-  $('label[for="sValor"]').textContent=atual?'Quanto cai na conta por mês':`Quanto caiu na conta em ${mesNome(p.y,p.m)}`;
+  $('label[for="sValor"]').textContent=atual?'Quanto cai na conta por mês':k<MES_ATUAL?`Quanto caiu na conta em ${mesNome(p.y,p.m)}`:`Quanto vai cair na conta em ${mesNome(p.y,p.m)}`;
   $('#sValor').value=v?String(v).replace('.',','):'';open('#sheetSal')}
 $('#salBtn').onclick=()=>openSal();$('#addSal').onclick=()=>openSal();
-// mudar o salário de um mês que passou muda só ele: o mês seguinte fica com o que já tinha
+// o salário deste mês vale também pros próximos; o de um mês que passou ou que ainda vai chegar muda só ele
+// (o mês seguinte fica com o que já tinha). Um mês que já tem um salário só dele continua só com ele
 $('#sForm').onsubmit=e=>{e.preventDefault();const v=parse($('#sValor').value), k=salMes, p=ymParse(k), prox=ym(p.y,p.m+1);
   closeSheets();setTimeout(()=>change(()=>{
-    if(k<MES_ATUAL&&!(prox in S.salarios))S.salarios[prox]=salarioDe(p.y,p.m+1);
-    S.salarios[k]=v;if(k===MES_ATUAL)delete S.aviso},k===MES_ATUAL?'Salário atualizado':`Salário de ${mesNome(p.y,p.m)} atualizado`),250)};
+    if(k>MES_ATUAL||k in S.ajustes)S.ajustes[k]=v;
+    else{if(k<MES_ATUAL&&!(prox in S.salarios))S.salarios[prox]=baseDe(p.y,p.m+1);S.salarios[k]=v}
+    if(k===MES_ATUAL)delete S.aviso},k===MES_ATUAL?'Salário atualizado':`Salário de ${mesNome(p.y,p.m)} atualizado`),250)};
 $('#exClear').onclick=()=>{change(()=>{S=VAZIO()});openSal()};
 
 function syncMesBtns(){document.querySelectorAll('[data-mes-for]').forEach(b=>{const v=ymParse($('#'+b.dataset.mesFor).value);b.querySelector('span').textContent=v?mesLongo(v.y,v.m):'Escolher mês'})}
@@ -693,8 +697,8 @@ function renderCal(){
     ...(todo.length?[linha(svg('assinaturas'),'var(--c-outros)','Todo mês',esc(todo.map(x=>x.nome).join(', ')),sum(todo),1)]:[])].join('')||'<p>Nenhum gasto neste mês.</p>';
   // o resumo do mês numa linha só: quanto sai e quanto sobra (ou falta), e a barra embaixo; num mês que passou, saiu e sobrou
   const sal=inf.sal, neg=sal>0&&inf.sobra<0, topoM=Math.max(sal,inf.sai,1);
-  // este mês e os que passaram mostram o salário com o lápis, pra corrigir; os próximos seguem o deste mês
-  const salBtn=k>kHoje?'':`<button type="button" class="sal-btn press" data-sal="${ym(y,m)}" aria-label="Editar salário de ${mesNome(y,m)}">
+  // todo mês mostra o salário com o lápis, pra mudar só aquele mês (o deste mês vale também pros próximos)
+  const salBtn=`<button type="button" class="sal-btn press" data-sal="${ym(y,m)}" aria-label="Editar salário de ${mesNome(y,m)}">
       <span>${sal?`Salário <span class="num">${fmt(sal)}</span>`:'Colocar salário'}</span>${LAPIS}</button>`;
   $('#cDet').innerHTML=`<div class="lbl">${mesLongo(y,m)}${atual?' · este mês':k===kHoje-1?' · mês passado':''}</div>
     ${salBtn}

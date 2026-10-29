@@ -25,7 +25,7 @@ Quem abre pela primeira vez vê valores de exemplo e pode tocar em **Começar do
 ## Histórico dos meses
 
 - O salário é de cada mês. Quando o mês vira, um aviso no topo pergunta se o salário continua o mesmo (**Continua**, **Mudar** ou fechar). Até a resposta, o mês novo fica com o salário do mês passado.
-- Em **Meses**, a seta pra trás mostra os meses que passaram, desde o primeiro mês de uso do app, sempre 6 por vez. O lápis no salário do mês corrige o valor daquele mês sem mudar os outros.
+- Em **Meses**, a seta pra trás mostra os meses que passaram, desde o primeiro mês de uso do app, sempre 6 por vez. Todo mês tem o salário com o lápis: no mês atual ele vale também pros próximos; num mês que passou ou que ainda vai chegar (um 13º, por exemplo) muda só aquele mês.
 - O que passou não muda: mudar o valor de um gasto de todo mês ou de uma meta vale do mês atual em diante, e apagar um gasto que já valia antes tira ele só do mês atual em diante. Um gasto lançado no próprio mês pode ser corrigido ou apagado de vez, e editar um parcelado corrige a compra inteira.
 - O histórico guarda o ano passado e o atual. Na virada do ano, um aviso diz quais meses vão sair (**Entendi** ou **Salvar cópia**), e eles só saem no Entendi.
 - No rodapé, **Apagar histórico** tira os meses que passaram depois de duas confirmações. Este mês e os gastos que continuam ficam.
