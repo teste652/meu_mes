@@ -28,7 +28,7 @@ const CATS=[
   {k:'compras',n:'Compras',g:'v'},
   {k:'lazer',n:'Lazer',g:'v'},
   {k:'assinaturas',n:'Assinaturas',g:'v'},
-  {k:'projetos',n:'Projetos',g:'v'},
+  {k:'projetos',n:'Projetos',g:'g'},
   {k:'reserva',n:'Guardar',g:'g'},
   {k:'investir',n:'Investimentos',g:'g'}
 ];
@@ -63,7 +63,8 @@ const mesCurto=(y,m)=>new Date(y,m,1).toLocaleDateString('pt-BR',{month:'short',
 const taxa=v=>{const n=parseFloat(String(v||'').replace(',','.'));return isFinite(n)&&n>0?n/100:0};
 const idxMes=(y,m)=>y*12+m;
 const MES_ATUAL=ym(Y0,M0);
-const guarda=c=>CAT[c]&&CAT[c].g==='g';
+// Projetos conta como investir na barra do grupo, mas o lembrete de guardar só some com Guardar ou Investimentos
+const guarda=c=>c==='reserva'||c==='investir';
 /* ---------- metas ---------- */
 // o plano: guarda 'mensal' todo mês a partir de 'inicio', com rendimento, até chegar no valor
 function planoMeta(t){const r=+t.taxa||0;let b=+t.ja||0,n=0;while(b<t.valor&&n<600){b=b*(1+r)+t.mensal;n++}return {n,b,ok:b>=t.valor}}
