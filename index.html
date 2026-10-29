@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- segurança: o app só carrega o que vem do próprio site e não consegue mandar nada pra outro lugar -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#1a1b1f">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Seu salário, seus gastos, pra onde vai o dinheiro, os próximos meses e suas metas.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meu Mês">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Meu Mês</title>
+<link rel="stylesheet" href="fonts/fontes.css">
+<style>
+/* Layout: uma coluna de cartões bem arredondados, saldo no topo, ação fixa embaixo do polegar */
+:root{
+  --bg:#1a1b1f; --surface:#24252a; --surface-2:#2d2e34; --ink:#ececef; --muted:#a0a2aa; --line:#383940;
+  --accent:#f1f1f3; --accent-ink:#141518; --accent-soft:#2a2b30;
+  --hero:#5cc39b; --hero-hi:#93e2c0; --hero-lo:#3a9a76; --hero-ink:#0b1a14; --hero-neg:#663600; --warn:#e9a24e; --warn-soft:#3a2a16; --bad:#f0a750; --bad-soft:#3a2a16;
+  --c-contas:#7aa8dc; --c-comida:#eda25a; --c-transporte:#a98ce6; --c-pessoal:#cfa58a; --c-compras:#e783ad; --c-lazer:#5cc6c0; --c-reserva:#94c46a; --c-investir:#dcbd6a;
+  --c-saude:#66d0a0; --c-educacao:#97a3f2; --c-dividas:#a3afc2; --c-projetos:#cf93e3; --c-assinaturas:#5ec4e4; --c-outros:#5d5f67;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.28);
+  --display:"Bricolage Grotesque",ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
+  --body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r-xl:30px; --r-lg:22px; --r-md:16px; --r-pill:999px;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:480px;margin:0 auto;padding-block:18px 120px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* clique que afunda e volta */
+.press{transition:transform .38s var(--spring),background-color .2s,box-shadow .2s;will-change:transform;touch-action:manipulation}
+.press.down{transform:scale(.92);transition:transform .09s ease-out}
+.press.down.soft{transform:scale(.97)}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-inline:4px}
+.top h1{font-size:1.35rem;font-weight:800}
+.top .mes{color:var(--muted);font-size:.85rem;font-weight:600}
+
+.card{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:20px}
+
+/* saldo */
+.hero{background:radial-gradient(100% 80% at 100% 0%,color-mix(in srgb,var(--hero-hi) 45%,transparent) 0%,transparent 60%),linear-gradient(150deg,color-mix(in srgb,var(--hero-hi) 50%,var(--hero)) 0%,var(--hero) 50%,color-mix(in srgb,var(--hero-lo) 55%,var(--hero)) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 12px 28px -10px color-mix(in srgb,var(--hero) 32%,transparent);color:var(--hero-ink);border-radius:34px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:currentColor;opacity:.06;pointer-events:none}
+.sal-btn{display:flex;align-items:center;gap:10px;align-self:flex-start;background:rgba(0,0,0,.14);border-radius:var(--r-pill);padding:8px 14px 8px 12px;font-weight:600;font-size:.9rem;color:inherit}
+.sal-btn svg{width:16px;height:16px;opacity:.85}
+.lbl{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.8}
+.big{font-size:clamp(2.6rem,12vw,3.4rem);font-weight:800;line-height:1}
+.big small{font-size:.45em;font-weight:700;opacity:.75;margin-right:4px;vertical-align:.55em}
+.bar{display:flex;height:14px;border-radius:var(--r-pill);overflow:hidden;background:color-mix(in srgb,currentColor 16%,transparent);gap:2px}
+.bar span{display:block;height:100%;transition:width .7s cubic-bezier(.22,1,.36,1);border-radius:var(--r-pill)}
+.bar .b-fix,.legend .i-fix{background:currentColor}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;font-weight:600}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+.hero.neg .big{color:var(--hero-neg)}
+
+.example{display:flex;gap:10px;align-items:center;background:var(--surface);box-shadow:var(--shadow);color:var(--ink);border-radius:var(--r-lg);padding:12px 14px;font-size:.88rem}
+.example button{margin-left:auto;flex:none;background:var(--surface-2);border-radius:var(--r-pill);padding:8px 12px;font-weight:700;font-size:.82rem}
+
+/* seções */
+.sec-head{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.sec-head h2{font-size:1.15rem;font-weight:700}
+.sec-head p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
+.sec-head .grow{flex:1;min-width:0}
+.chev{width:38px;height:38px;border-radius:14px;background:var(--surface-2);display:grid;place-items:center;flex:none}
+.chev svg{transition:transform .45s var(--spring)}
+.open .chev svg{transform:rotate(180deg)}
+.collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s cubic-bezier(.22,1,.36,1)}
+.open .collapse{grid-template-rows:1fr}
+.collapse>div{overflow:hidden;min-height:0}
+
+@keyframes rise{to{opacity:1;transform:none}}
+.row .dot.investir{background:linear-gradient(140deg,#e2c46f,#8c6a1c)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+
+/* listas */
+.list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px 10px 12px;border-radius:var(--r-lg);background:var(--surface-2);animation:rise .4s cubic-bezier(.22,1,.36,1) both}
+.row.leaving{animation:leave .3s ease-in forwards}
+@keyframes leave{to{opacity:0;transform:scale(.9);height:0;padding-block:0;margin-block:-4px}}
+.row .dot{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none}
+.row .dot svg{width:17px;height:17px}
+.row .tx{flex:1;min-width:0}
+.row .tx b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .tx span{font-size:.78rem;color:var(--muted)}
+.row .val{font-weight:700}
+.x{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:var(--muted);flex:none}
+.x:hover{background:var(--line)}
+.empty{color:var(--muted);font-size:.88rem;padding:14px;border:2px dashed var(--line);border-radius:var(--r-lg);text-align:center}
+.mini-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.chip-btn{background:var(--surface-2);border-radius:var(--r-pill);padding:10px 14px;font-weight:600;font-size:.86rem;display:inline-flex;gap:6px;align-items:center}
+.chip-btn svg{width:16px;height:16px}
+.chip-btn.primary{background:var(--accent-soft);color:var(--ink)}
+
+/* barra inferior */
+.dock{position:fixed;left:0;right:0;bottom:0;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(to top,var(--bg) 60%,transparent);z-index:5}
+.dock .in{max-width:480px;margin:0 auto;display:flex;gap:10px}
+.fab{flex:1;background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:17px 20px;font-weight:700;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.fab svg{width:20px;height:20px}
+.fab.ghost{flex:none;width:58px;padding:0;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+/* bottom sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s;z-index:20}
+.scrim.on{opacity:1;pointer-events:auto}
+/* com o teclado do celular aberto, a janela fica em cima dele (--teclado) e nunca mais alta que o que sobra de tela (--visivel) */
+.sheet{position:fixed;left:0;right:0;bottom:var(--teclado,0px);z-index:21;transform:translateY(105%);visibility:hidden;transition:transform .5s cubic-bezier(.22,1,.36,1),visibility 0s .5s,bottom .25s ease-out;
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.sheet.on{transform:none;visibility:visible;transition:transform .5s cubic-bezier(.22,1,.36,1),bottom .25s ease-out}
+.sheet .in{max-width:520px;margin:0 auto;background:var(--surface);border-radius:32px 32px 0 0;padding:10px 20px calc(22px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;max-height:min(88vh,calc(var(--visivel,100vh) - 16px));overflow:auto}
+.teclado .sheet .in{padding-bottom:16px}
+.grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:4px auto 0}
+.sheet h3{font-size:1.3rem}
+.seg{display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:4px;position:relative}
+.seg button{flex:1;padding:11px 8px;border-radius:var(--r-pill);font-weight:700;font-size:.88rem;position:relative;z-index:1;color:var(--muted);transition:color .25s}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg .pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:var(--surface);border-radius:var(--r-pill);box-shadow:var(--shadow);transition:transform .42s cubic-bezier(.34,1.12,.64,1)}
+.seg.right .pill{transform:translateX(100%)}
+.seg.three .pill{width:calc((100% - 8px)/3)}
+.seg.three button{padding-inline:4px;font-size:.84rem}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:.8rem;font-weight:700;color:var(--muted)}
+.field input{font:inherit;color:var(--ink);background:var(--surface-2);border:2px solid transparent;border-radius:var(--r-md);padding:14px 16px;font-size:1rem;width:100%;transition:border-color .2s}
+.field input:focus{border-color:var(--accent);outline:none}
+.money{position:relative}
+.money span{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--muted);font-family:var(--display);font-size:1.3rem}
+.money input{padding-left:52px;font-family:var(--display);font-size:1.6rem;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{display:inline-flex;align-items:center;gap:7px;padding:9px 13px 9px 9px;border-radius:var(--r-pill);background:var(--surface-2);font-weight:600;font-size:.86rem;border:2px solid transparent}
+.chips button i{width:22px;height:22px;border-radius:8px;display:grid;place-items:center;color:#fff}
+.chips button i svg{width:13px;height:13px}
+/* a área escolhida fica na cor dela; o foco do teclado é tracejado, pra não parecer escolhida */
+.chips button[aria-pressed="true"]{border-color:var(--cc,var(--ink));background:color-mix(in srgb,var(--cc,var(--ink)) 24%,var(--surface-2));font-weight:700}
+.chips button:focus-visible{outline:2px dashed var(--muted);outline-offset:3px}
+.chips button.realce{animation:realce .6s var(--spring)}
+@keyframes realce{40%{transform:scale(1.08)}}
+#gAreaLbl.pick{color:var(--warn)}
+.go{background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:17px;font-weight:700;font-size:1rem}
+.go:disabled{opacity:.45}
+
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--r-pill);font-weight:600;font-size:.88rem;transition:all .4s var(--spring);z-index:30;pointer-events:none;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.teclado .toast{bottom:calc(var(--teclado) + 16px)}
+.save{font-size:.75rem;color:var(--muted);text-align:center}
+.save.erro{color:var(--bad);font-weight:700}
+
+
+/* planejar */
+[hidden]{display:none!important}
+.plan-body{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row2>*{min-width:0}
+.field select{font:inherit;color:var(--ink);background:var(--surface-2);border:2px solid transparent;border-radius:var(--r-md);padding:14px 16px;font-size:1rem;width:100%;-webkit-appearance:none;appearance:none}
+.field select:focus{border-color:var(--accent);outline:none}
+.field input[type="month"]{min-height:54px}
+.field .opt{font-weight:500;opacity:.75}
+.pctf{position:relative}
+.pctf input{padding-right:64px}
+.pctf span{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:.8rem;font-weight:700;color:var(--muted);pointer-events:none}
+.stepper{display:flex;align-items:center;gap:6px;background:var(--surface-2);border-radius:var(--r-md);padding:5px}
+.stepper button{width:44px;height:44px;border-radius:13px;background:var(--surface);display:grid;place-items:center;flex:none;box-shadow:var(--shadow)}
+.stepper button svg{width:18px;height:18px}
+.stepper output{flex:1;text-align:center;font-family:var(--display);font-weight:800;font-size:1.35rem;font-variant-numeric:tabular-nums}
+.res{border-radius:var(--r-lg);padding:16px;background:linear-gradient(120deg,color-mix(in srgb,var(--hero) 9%,var(--surface-2)),var(--surface-2) 60%);display:flex;flex-direction:column;gap:6px;min-width:0}
+.res .lbl{color:var(--muted);opacity:1}
+.big2{font-family:var(--display);font-size:clamp(1.8rem,8.5vw,2.3rem);font-weight:800;line-height:1.05}
+.res p{margin:0;color:var(--muted);font-size:.86rem}
+.res p b{color:var(--ink)}
+/* meta: o mês no meio e, embaixo, um andar pra cada coisa, separados por uma linha; o último é quanto sobra */
+#tRes>.lbl,#tRes>.big2{text-align:center}
+.andares{margin-top:8px}
+.andares>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 2px;border-top:1px solid var(--line)}
+.andares span{font-size:.9rem;font-weight:600;color:var(--muted)}
+.andares b{font-size:1.15rem;font-weight:800;white-space:nowrap}
+.andares .fim b{color:var(--hero)}
+.andares .neg b{color:var(--bad)}
+.chart{display:flex;align-items:flex-end;gap:3px;height:96px;margin-top:8px}
+.chart span{flex:1;min-width:2px;border-radius:6px 6px 3px 3px;transition:height .6s cubic-bezier(.22,1,.36,1)}
+.chart-x{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);font-weight:600}
+.leg2{display:flex;gap:14px;font-size:.78rem;color:var(--muted);font-weight:600;flex-wrap:wrap}
+.leg2 i{display:inline-block;width:10px;height:10px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+
+.row.off{opacity:.55}
+.mes-btn{display:flex;align-items:center;gap:10px;width:100%;background:var(--surface-2);border-radius:var(--r-md);padding:15px 16px;font-weight:600;font-size:1rem;text-align:left;border:2px solid transparent}
+/* o mês quebra linha em tela estreita em vez de sumir cortado */
+.mes-btn span{flex:1;min-width:0;overflow-wrap:break-word}
+.mes-btn span::first-letter{text-transform:uppercase}
+.mes-btn svg{width:19px;height:19px;color:var(--muted);flex:none}
+.ano-nav{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ano-nav b{font-family:var(--display);font-size:clamp(1.05rem,5vw,1.3rem);font-weight:800;white-space:nowrap}
+.nav{width:44px;height:44px;border-radius:14px;background:var(--surface-2);display:grid;place-items:center;flex:none}
+.nav svg{width:18px;height:18px}
+.nav:disabled{opacity:.3}
+/* tela bem estreita: botões e texto menores pra o período caber entre as setas */
+@media (max-width:320px){.ano-nav{gap:6px}.ano-nav .nav{width:36px;height:36px;border-radius:12px}.ano-nav b{font-size:.92rem}}
+.meses{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.meses button{border-radius:var(--r-md);background:var(--surface-2);padding:15px 0;font-weight:700;font-size:.95rem;text-transform:capitalize;border:2px solid transparent}
+.meses button.hoje{border-color:var(--line)}
+.meses button.sel{background:var(--hero);color:var(--hero-ink)}
+.meses button:disabled{opacity:.3}
+.res .big2.neg{color:var(--bad)}
+/* detalhe do mês: numa linha, quanto sai e quanto sobra; a barra embaixo mostra a proporção.
+   Os dois ficam sempre lado a lado: quando não cabem, o app diminui um pouco a letra (só numa tela estreita demais um desce) */
+#cDet{gap:12px;padding:18px}
+.dres{display:flex;justify-content:space-between;align-items:baseline;gap:1.1em;font-size:.9rem;font-weight:600;color:var(--muted)}
+.dres>span{white-space:nowrap}
+.dres.quebra{flex-wrap:wrap;row-gap:4px}
+.dres b{margin-left:.3em;font-family:var(--display);font-size:1.5em;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.dres .sb b{color:var(--hero)}
+.dres.neg .sb b{color:var(--bad)}
+.split-bar{display:flex;gap:2px;height:8px;border-radius:var(--r-pill);overflow:hidden;background:var(--line);margin:4px 0 2px}
+.split-bar span{display:block;height:100%;border-radius:var(--r-pill);transition:width .6s cubic-bezier(.22,1,.36,1)}
+.d-gasto{background:color-mix(in srgb,var(--ink) 55%,transparent)}
+.d-sobra{background:var(--hero)}
+.d-falta{background:var(--bad)}
+/* os gastos do mês: um embaixo do outro, com folga, separados do resumo por uma linha */
+.mini{display:flex;flex-direction:column;gap:18px;margin-top:4px;padding-top:16px;border-top:1px solid var(--line)}
+.mini div{display:flex;align-items:center;gap:12px;font-size:.92rem;min-width:0}
+.mini i{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:#fff;flex:none}
+.mini i svg{width:15px;height:15px}
+.mini .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;overflow-wrap:break-word}
+.mini .t small{font-size:.8rem;color:var(--muted);font-weight:600}
+/* nada some cortado: o nome quebra linha; só a lista do "Todo mês" termina em reticências */
+.mini .t small.lista{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:340px){.mini i{display:none}}
+.mini b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.sub-h{font-size:1.05rem;font-weight:700;margin-top:6px}
+.money.sm input{font-size:1.2rem;padding-left:46px}
+.money.sm span{font-size:1rem}
+
+.sheet-top{display:flex;align-items:center;gap:12px;min-width:0}
+.sheet-top h3{flex:1;min-width:0}
+.back{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:var(--r-pill);padding:9px 14px 9px 9px;font-weight:700;font-size:.88rem;flex:none}
+.back svg{width:18px;height:18px}
+.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s}
+/* janela que ficou atrás de outra: recua e apaga um pouco */
+.sheet.atras{pointer-events:none}
+.sheet.atras .in{transform:scale(.94) translateY(-10px);filter:brightness(.55)}
+/* janelas do gasto: o Voltar e o botão principal ficam sempre à vista; só o meio rola */
+.sheet .in.fixo{overflow:hidden}
+.fixo .corpo{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:16px;margin:-4px -20px;padding:4px 20px}
+.fixo .pe{flex:none;display:flex;flex-direction:column;gap:12px}
+.fixo .corpo.mais{-webkit-mask-image:linear-gradient(#000 calc(100% - 36px),transparent);mask-image:linear-gradient(#000 calc(100% - 36px),transparent)}
+#gVMLbl{font-size:.88rem}
+#gVMLbl b{color:var(--ink);font-family:var(--display);font-weight:800}
+.parc-opts{display:flex;flex-direction:column;gap:14px}
+.parc-res{display:flex;flex-direction:column;gap:10px;border-radius:var(--r-md);padding:16px 18px;background:linear-gradient(120deg,color-mix(in srgb,var(--hero) 9%,var(--surface-2)),var(--surface-2) 60%);font-size:.98rem;color:var(--muted)}
+.parc-res[hidden]{display:none}
+.parc-res>b{color:var(--ink);font-family:var(--display);font-size:1.4rem;line-height:1.15}
+.parc-res .pr-l{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 16px}
+.parc-res .pr-l b{color:var(--ink);font-weight:700}
+.parc-res .pr-m{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--ink);white-space:nowrap}
+.parc-res .pr-m svg{width:17px;height:17px;color:var(--muted)}
+.parc-res small{font-size:.86rem}
+.so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* como você paga: mais espaço entre as partes e letra maior, pra ler sem esforço */
+#sheetPag .corpo,#sheetPag .parc-opts{gap:30px}
+#sheetPag .field{gap:10px}
+#sheetPag .field label{font-size:.92rem}
+/* o valor em destaque, pra ver bem o número, com mais folga até os botões */
+#sheetPag #gVMF{gap:14px}
+#sheetPag #gVMLbl{font-size:1.12rem}
+#sheetPag #gVMLbl b{font-family:var(--display);font-size:1.15em;color:var(--ink)}
+#sheetPag .seg button{padding-block:14px}
+#sheetPag .seg:not(.three) button{font-size:.95rem}
+.sec-head{padding:0}
+.ver-todos{display:block;width:100%;margin-top:12px;padding:12px;border-radius:var(--r-md);background:var(--surface-2);font-weight:700;font-size:.88rem;color:var(--ink)}
+
+/* para onde vai o dinheiro */
+.onde{display:grid;grid-template-columns:132px 1fr;gap:16px;align-items:center;margin-top:14px}
+.donut{position:relative;width:132px;height:132px}
+.donut svg{width:100%;height:100%;transform:rotate(-90deg)}
+.donut circle{fill:none;stroke-width:16;transition:stroke-dasharray .6s cubic-bezier(.22,1,.36,1),stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)}
+.donut .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.1}
+.donut .c b{font-family:var(--display);font-weight:800;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.donut .c span{font-size:.7rem;color:var(--muted);font-weight:600}
+.leg-onde{display:flex;flex-direction:column;gap:10px;min-width:0;margin:0;padding:0;list-style:none}
+.leg-onde li{display:flex;align-items:center;gap:8px;min-width:0}
+.leg-onde i{width:10px;height:10px;border-radius:3px;flex:none}
+.leg-onde b{flex:1;min-width:0;font-size:.84rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.leg-onde small{font-size:.84rem;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.onde .empty{grid-column:1/-1}
+/* tela estreita: a rosca diminui pra legenda caber inteira e, mais estreita ainda, a legenda vai pra baixo */
+@media (max-width:380px){.onde{grid-template-columns:116px 1fr;gap:14px}.donut{width:116px;height:116px}.donut .c b{font-size:.95rem}}
+@media (max-width:340px){.onde{grid-template-columns:1fr;justify-items:center}.leg-onde{width:100%}}
+/* embaixo da rosca: uma barra por grupo; a barra inteira é o salário e enche até a porcentagem que o grupo leva */
+.grupos{display:flex;flex-direction:column;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.grupos .lbl{color:var(--muted);opacity:1}
+.gb .gl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.9rem;font-weight:700}
+.gb .gl b{font-size:1.05rem;font-weight:800;white-space:nowrap}
+.gb .gt{height:8px;border-radius:var(--r-pill);background:var(--line);margin-top:6px;overflow:hidden}
+.gb .gt span{display:block;height:100%;border-radius:inherit;background:var(--ink);opacity:.7;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.gb.over .gl b{color:var(--bad)}
+.gb.over .gt span{background:var(--bad);opacity:1}
+
+/* próximos meses: um cartão por mês com quanto sai; um pontinho no canto marca o mês em que acaba parcela ou bate meta */
+.cmeses{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.cmeses button{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;padding:15px 16px 16px;border-radius:20px;background:var(--surface-2);border:2px solid transparent;text-align:left}
+.cmeses button.hoje{border-color:var(--line)}
+.cmeses .cm{font-family:var(--display);font-size:1.25rem;font-weight:800;line-height:1.1;text-transform:capitalize}
+.cmeses .cm small{font-size:.7em;font-weight:700;opacity:.6;margin-left:3px}
+.cmeses .cv{font-size:clamp(1rem,4.6vw,1.2rem);font-weight:700;white-space:nowrap;max-width:100%}
+.cmeses .cv small{font-size:.75em;opacity:.7;margin-right:2px}
+.cmeses .cv.over{color:var(--bad)}
+.cmeses .cmt{display:block;align-self:stretch;height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:5px}
+.cmeses .cmt span{display:block;height:100%;border-radius:inherit;background:var(--hero);transition:width .5s cubic-bezier(.22,1,.36,1)}
+.cmeses .cmt span.over{background:var(--bad)}
+.cmeses .cdots{position:absolute;top:-3px;right:-3px;display:flex;gap:2px}
+.cmeses .cdots i{width:14px;height:14px;border-radius:50%;background:var(--c-compras);border:2px solid var(--surface)}
+.cmeses .cdots i.cmeta{background:var(--c-investir)}
+.cmeses button.sel{background:var(--hero);color:var(--hero-ink)}
+.cmeses button.sel .cv.over{color:var(--hero-neg)}
+.cmeses button.sel .cmt{background:color-mix(in srgb,currentColor 22%,transparent)}
+.cmeses button.sel .cmt span{background:currentColor}
+.cmeses button.sel .cmt span.over{background:var(--hero-neg)}
+
+/* janela de gasto */
+/* o quanto sobra: maior e com folga do botão */
+.depois{margin:4px 0 14px;font-size:1.05rem;color:var(--muted);text-align:center;min-height:1.3em}
+.depois:empty{display:none}
+.depois b{color:var(--ink);font-size:1.1em}
+.depois.neg,.depois.neg b{color:var(--bad)}
+.apagar{padding:12px;border-radius:var(--r-pill);font-weight:700;font-size:.92rem;color:var(--bad);margin-top:-6px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+.row{cursor:pointer}
+.row .val{white-space:nowrap;flex:none}
+.chip-btn:disabled{opacity:.45;cursor:default}
+.toast{white-space:normal;width:max-content;max-width:calc(100vw - 32px);text-align:center}
+.toast.on.acao{pointer-events:auto}
+.toast.acao{display:flex;align-items:center;gap:12px;padding:8px 8px 8px 18px}
+.toast button{background:color-mix(in srgb,currentColor 16%,transparent);border-radius:var(--r-pill);padding:7px 13px;font-weight:800;color:inherit}
+.stepper button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.hero .add-sal{align-self:flex-start;background:var(--hero-ink);color:var(--hero);border-radius:var(--r-pill);padding:10px 16px;font-weight:700;font-size:.9rem}
+
+.install{display:flex;gap:10px;align-items:center;background:var(--surface);box-shadow:var(--shadow);border-radius:var(--r-lg);padding:12px 14px;font-size:.88rem}
+.install.passos{align-items:flex-start}
+.install .it{flex:1;min-width:0;line-height:1.4}
+.install b{font-weight:700}
+.install ol{margin:6px 0 0;padding-left:1.25em;display:grid;gap:5px}
+.install .ic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;background:var(--surface-2);vertical-align:-6px;margin-inline:1px}
+.install .ic svg{width:14px;height:14px}
+.install .go{padding:10px 16px;font-size:.88rem;flex:none}
+.install.passos .x{margin-top:-4px}
+.copia #instLinkBox{display:contents}
+
+/* lembrete de guardar, logo abaixo do saldo */
+.lembrete{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center;background:var(--surface);box-shadow:var(--shadow);border-radius:var(--r-lg);padding:12px 6px 12px 12px}
+.lembrete .li{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;color:#fff;background:var(--c-reserva);grid-row:span 2;align-self:start}
+.lembrete .li svg{width:18px;height:18px}
+.lembrete p{margin:0;font-size:.88rem;font-weight:600;line-height:1.35}
+.lembrete .x{grid-row:span 2;align-self:start;margin-top:-4px}
+.lembrete .sim{grid-column:2;justify-self:start;background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:9px 15px;font-weight:700;font-size:.86rem}
+
+/* metas salvas */
+.metas{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.meta{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left;padding:13px 14px;border-radius:var(--r-lg);background:var(--surface-2)}
+.meta .mt,.meta .ms{display:flex;justify-content:space-between;align-items:baseline;gap:10px;min-width:0}
+.meta .mt b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.meta .mt .num{font-weight:800;flex:none}
+.meta .mbar{display:block;height:8px;border-radius:var(--r-pill);background:var(--line);overflow:hidden}
+.meta .mbar span{display:block;height:100%;border-radius:inherit;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.meta .ms{font-size:.8rem;color:var(--muted);font-weight:600}
+.meta .ms span:last-child{flex:none}
+.meta.feita .mt .num{color:var(--hero)}
+.metas .empty{text-align:left}
+
+/* cópia de segurança, discreta no rodapé */
+.copia{display:flex;justify-content:center;align-items:center;gap:4px;margin-top:-18px;font-size:.78rem;color:var(--muted)}
+.copia button{padding:8px 6px;font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+/* no app instalado a cópia some. O Restaurar fica enquanto o app ainda não tem nada da pessoa (no iPhone ele não vê o que ficou no Safari),
+   e os dois voltam se o celular não deixar salvar, que aí a cópia é o jeito de não perder nada */
+.instalado .save:not(.erro)+.copia:not(.novo),.instalado .save:not(.erro)+.copia #bkSalvar,.instalado .save:not(.erro)+.copia #bkSalvar+span{display:none}
+/* link da privacidade: fica sempre, até no app instalado */
+.priv{margin:-18px 0 0;text-align:center;font-size:.78rem}
+.priv a{display:inline-block;padding:8px 6px;font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Meu Mês</h1>
+    <span class="mes" id="mes"></span>
+  </header>
+
+
+  <div class="install" id="inst" hidden>
+    <div class="it" id="instTx"></div>
+    <button class="go press" type="button" id="instBtn" hidden>Instalar</button>
+    <button class="x press" type="button" id="instX" aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <section class="hero" id="hero">
+    <button class="sal-btn press" id="salBtn" type="button" aria-label="Editar salário">
+      <span>Salário <span class="num" id="salTxt"></span></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>
+    </button>
+    <div>
+      <div class="lbl" id="livreLbl">Ainda pode gastar</div>
+      <div class="big num" id="livre"></div>
+    </div>
+    <button class="add-sal press" id="addSal" type="button" hidden>Colocar meu salário</button>
+    <div class="bar" aria-hidden="true"><span class="b-fix" id="bFix"></span></div>
+    <div class="legend"><span><i class="i-fix"></i>Gastos do mês <span class="num" id="lFix"></span></span></div>
+  </section>
+
+  <div class="example" id="exBox" hidden>
+    <span>Valores de <b>exemplo</b></span>
+    <button class="press" id="exClear" type="button">Começar do zero</button>
+  </div>
+
+  <!-- aparece só enquanto o mês não tem nada pra guardar -->
+  <div class="lembrete" id="lembrete" hidden>
+    <span class="li"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M16 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7"/></svg></span>
+    <p>Guarde um pouco este mês</p>
+    <button class="x press" type="button" id="lemX" aria-label="Agora não"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <button class="sim press" type="button" id="lemSim"></button>
+  </div>
+
+  <section class="card">
+    <div class="sec-head">
+      <div class="grow">
+        <h2>Gastos</h2>
+      </div>
+    </div>
+    <div class="list" id="fixList"></div>
+    <button class="ver-todos press soft" type="button" id="fixMais" hidden></button>
+  </section>
+
+  <!-- para onde vai o dinheiro: rosca por área + quanto do salário vai pra cada grupo -->
+  <section class="card">
+    <div class="sec-head">
+      <div class="grow">
+        <h2>Para onde vai o dinheiro</h2>
+      </div>
+    </div>
+    <div class="onde" id="onde"></div>
+    <div class="grupos" id="grupos"></div>
+  </section>
+
+  <section class="card">
+    <div class="sec-head">
+      <div class="grow">
+        <h2>Próximos meses</h2>
+      </div>
+    </div>
+    <div class="plan-body">
+      <div class="ano-nav">
+        <button type="button" class="nav press" id="cPrev" aria-label="Meses anteriores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+        <b class="num" id="cAno"></b>
+        <button type="button" class="nav press" id="cNext" aria-label="Próximos meses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+      <div class="cmeses" id="cGrid"></div>
+      <div class="res" id="cDet" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="card" id="metaCard">
+    <div class="sec-head">
+      <div class="grow">
+        <h2>Metas</h2>
+      </div>
+    </div>
+    <div class="metas" id="metas"></div>
+    <button class="ver-todos press soft" type="button" id="metaNova"></button>
+  </section>
+
+  <p class="save" id="saveTxt"></p>
+  <div class="copia">
+    <button type="button" class="press" id="bkSalvar">Salvar cópia</button><span aria-hidden="true">·</span><button type="button" class="press" id="bkAbrir">Restaurar cópia</button><span id="instLinkBox" hidden><span aria-hidden="true">·</span><button type="button" class="press" id="instLink">Instalar app</button></span>
+    <input type="file" id="bkArq" accept=".json,application/json" hidden>
+  </div>
+  <p class="priv"><a href="privacidade.html">Privacidade</a></p>
+</div>
+
+<nav class="dock"><div class="in">
+  <button class="fab press" type="button" data-add="fixo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Adicionar gasto</button>
+</div></nav>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- gasto em duas janelas: primeiro o valor, o que é e a área; depois, por cima, como paga -->
+<form id="gForm">
+<div class="sheet" id="sheetGasto" role="dialog" aria-modal="true" aria-labelledby="gTitle">
+  <div class="in fixo">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="gTitle">Novo gasto</h3></div>
+    <div class="corpo">
+      <div class="field">
+        <label for="gValor">Valor</label>
+        <div class="money"><span>R$</span><input id="gValor" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="0,00"></div>
+      </div>
+      <div class="field">
+        <label for="gNome">O que é</label>
+        <input id="gNome" enterkeyhint="next" autocomplete="off" placeholder="Ex.: mercado, tênis, conta de luz" maxlength="40">
+      </div>
+      <div class="field">
+        <label id="gAreaLbl">Área</label>
+        <div class="chips" id="gCats"></div>
+      </div>
+    </div>
+    <div class="pe">
+      <button class="go press" type="button" id="gProx">Próximo</button>
+      <button class="apagar press" type="button" id="gDel" hidden>Apagar este gasto</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheetPag" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+  <div class="in fixo">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="pTitle">Como você paga</h3></div>
+    <div class="corpo">
+      <div class="seg three" id="gPagSeg">
+        <span class="pill"></span>
+        <button type="button" data-pag="unico" aria-pressed="true">Só um mês</button>
+        <button type="button" data-pag="mes" aria-pressed="false">Todo mês</button>
+        <button type="button" data-pag="parc" aria-pressed="false">Parcelado</button>
+      </div>
+      <div class="parc-opts" id="gParcOpts">
+        <div class="field" id="gVMF">
+          <label id="gVMLbl"></label>
+          <div class="seg" id="gVMSeg">
+            <span class="pill"></span>
+            <button type="button" data-vm="total" aria-pressed="true">O total</button>
+            <button type="button" data-vm="parc" aria-pressed="false">Cada parcela</button>
+          </div>
+        </div>
+        <div class="field" id="gStepF">
+          <label>Parcelas</label>
+          <div class="stepper">
+            <button type="button" class="press" id="gMenos" aria-label="Menos parcelas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+            <output id="gNum" aria-live="polite">3x</output>
+            <button type="button" class="press" id="gMais" aria-label="Mais parcelas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+        </div>
+        <div class="parc-res" id="gParcRes" aria-live="polite"></div>
+        <div class="field">
+          <label for="gInicioBtn" id="gMesLbl">Sai do dinheiro de</label>
+          <input id="gInicio" type="hidden">
+          <button type="button" class="mes-btn press soft" id="gInicioBtn" data-mes-for="gInicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        </div>
+        <div class="field" id="gVenceF">
+          <label id="gVenceLbl">Primeira parcela vence em</label>
+          <div class="seg" id="gVenceSeg" role="group" aria-labelledby="gVenceLbl">
+            <span class="pill"></span>
+            <button type="button" data-vence="0" aria-pressed="true"></button>
+            <button type="button" data-vence="1" aria-pressed="false"></button>
+          </div>
+        </div>
+        <div class="field" id="gJurosF">
+          <label for="gJuros">Juros por mês <span class="opt">(opcional)</span></label>
+          <div class="pctf"><input id="gJuros" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0"><span>% ao mês</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pe">
+      <p class="depois" id="gDepois" aria-live="polite"></p>
+      <button class="go press" type="submit" id="gGo">Adicionar</button>
+    </div>
+  </div>
+</div>
+</form>
+
+<div class="sheet" id="sheetMeta" role="dialog" aria-modal="true" aria-labelledby="tTitle">
+  <form class="in" id="tForm">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="tTitle">Nova meta</h3></div>
+    <div class="field">
+      <label for="tNome">Pra quê</label>
+      <input id="tNome" enterkeyhint="next" autocomplete="off" placeholder="Ex.: reserva de emergência, viagem" maxlength="40">
+    </div>
+    <div class="field">
+      <label for="tValor">Quero juntar</label>
+      <div class="money"><span>R$</span><input id="tValor" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="5.000"></div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="tMes">Guardo por mês</label>
+        <div class="money sm"><span>R$</span><input id="tMes" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="300"></div>
+      </div>
+      <div class="field">
+        <label for="tJa">Já tenho <span class="opt">(opcional)</span></label>
+        <div class="money sm"><span>R$</span><input id="tJa" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="tTaxa">Rendimento <span class="opt">(opcional)</span></label>
+      <div class="pctf"><input id="tTaxa" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0"><span>% ao mês</span></div>
+    </div>
+    <div class="res" id="tRes" aria-live="polite"></div>
+    <button class="go press" type="submit" id="tGo">Criar meta</button>
+    <button class="apagar press" type="button" id="tDel" hidden>Apagar esta meta</button>
+  </form>
+</div>
+
+<div class="sheet" id="sheetSal" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+  <form class="in" id="sForm">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="sTitle">Seu salário</h3></div>
+    <div class="field">
+      <label for="sValor">Quanto cai na conta por mês</label>
+      <div class="money"><span>R$</span><input id="sValor" inputmode="decimal" autocomplete="off" placeholder="0,00"></div>
+    </div>
+    <button class="go press" type="submit">Salvar salário</button>
+  </form>
+</div>
+
+<div class="sheet" id="sheetMes" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="in">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="mTitle">Escolha o mês</h3></div>
+    <div class="ano-nav">
+      <button type="button" class="nav press" id="mPrev" aria-label="Ano anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <b class="num" id="mAno"></b>
+      <button type="button" class="nav press" id="mNext" aria-label="Próximo ano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+    </div>
+    <div class="meses" id="mGrid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- o código fica em arquivos separados: script escrito direto aqui no HTML é bloqueado pela política de segurança lá em cima -->
+<script src="app.js"></script>
+<script src="instalar.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "id": "./",
+  "name": "Meu Mês",
+  "short_name": "Meu Mês",
+  "description": "Organize seu salário, seus gastos, suas contas e suas metas. Os dados ficam só no seu celular.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1b1f",
+  "theme_color": "#1a1b1f",
+  "categories": [
+    "finance",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/inicio.webp",
+      "sizes": "780x1688",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Quanto ainda dá pra gastar no mês e cada gasto"
+    },
+    {
+      "src": "screenshots/para-onde-vai.webp",
+      "sizes": "780x1688",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Para onde vai o dinheiro, por área e na divisão 50/30/20"
+    },
+    {
+      "src": "screenshots/proximos-meses.webp",
+      "sizes": "780x1688",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Os próximos 12 meses e quando cada parcela acaba"
+    }
+  ]
+}

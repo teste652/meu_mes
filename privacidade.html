@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- mesma política de segurança do app: só carrega o que vem do próprio site -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1a1b1f">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Como o Meu Mês cuida dos seus dados: tudo fica só no seu celular.">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Privacidade · Meu Mês</title>
+<link rel="stylesheet" href="fonts/fontes.css">
+<style>
+/* página de privacidade no mesmo visual do app: cartões arredondados, fundo escuro e o verde do saldo no resumo */
+:root{
+  --bg:#1a1b1f; --surface:#24252a; --surface-2:#2d2e34; --ink:#ececef; --muted:#a0a2aa; --line:#383940;
+  --hero:#5cc39b; --hero-hi:#93e2c0; --hero-lo:#3a9a76; --hero-ink:#0b1a14;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.28);
+  --display:"Bricolage Grotesque",ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
+  --body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:480px;margin:0 auto;padding-block:18px 40px;display:flex;flex-direction:column;gap:16px}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance}
+.back{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;background:var(--surface-2);border-radius:999px;padding:9px 14px 9px 9px;font-weight:700;font-size:.88rem;color:var(--ink);text-decoration:none}
+.back svg{width:18px;height:18px}
+.back:focus-visible,a:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.tit{padding-inline:4px}
+.tit h1{font-size:2rem;font-weight:800;line-height:1.1}
+.tit p{margin:4px 0 0;color:var(--muted);font-size:.85rem;font-weight:600}
+.hero{background:radial-gradient(100% 80% at 100% 0%,color-mix(in srgb,var(--hero-hi) 45%,transparent) 0%,transparent 60%),linear-gradient(150deg,color-mix(in srgb,var(--hero-hi) 50%,var(--hero)) 0%,var(--hero) 50%,color-mix(in srgb,var(--hero-lo) 55%,var(--hero)) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 12px 28px -10px color-mix(in srgb,var(--hero) 32%,transparent);
+  color:var(--hero-ink);border-radius:30px;padding:20px;display:flex;gap:14px;align-items:flex-start}
+.hero i{width:42px;height:42px;border-radius:14px;background:rgba(0,0,0,.14);display:grid;place-items:center;flex:none}
+.hero i svg{width:22px;height:22px}
+.hero p{margin:0;font-size:1rem;font-weight:600;line-height:1.45}
+.hero b{display:block;font-family:var(--display);font-size:1.2rem;font-weight:800;line-height:1.2;margin-bottom:4px}
+.card{background:var(--surface);border-radius:30px;box-shadow:var(--shadow);padding:20px}
+.card h2{font-size:1.12rem;font-weight:700;margin-bottom:8px}
+.card p{margin:0 0 10px;color:var(--muted)}
+.card p:last-child{margin-bottom:0}
+.card b{color:var(--ink);font-weight:700}
+.card a{color:var(--ink);font-weight:600;text-underline-offset:3px}
+.nao{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:8px}
+.nao li{display:flex;gap:10px;align-items:flex-start;color:var(--ink)}
+/* um "certo" verde desenhado em CSS antes de cada item */
+.nao li::before{content:"";flex:none;width:7px;height:12px;margin:4px 5px 0 6px;border:solid var(--hero);border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.fim{align-self:center}
+/* contato: o e-mail fica numa linha só dele, inteiro e fácil de tocar */
+.card .pede{margin-bottom:2px;text-wrap:balance}
+.card .mail{display:inline-block;padding:5px 0;font-weight:700}
+/* seta que pula embaixo chamando pra descer; tocar desce a página e ela some quando a pessoa começa a rolar */
+html{scroll-behavior:smooth}
+.descer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:34px 0 calc(16px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(to top,var(--bg) 30%,transparent);pointer-events:none;transition:opacity .35s,visibility .35s;z-index:5}
+.descer a{pointer-events:auto;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--hero);color:var(--hero-ink);
+  box-shadow:0 10px 26px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.2);-webkit-tap-highlight-color:transparent}
+.descer svg{width:24px;height:24px;animation:quica 1.5s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes quica{0%,100%{transform:translateY(-4px)}50%{transform:translateY(4px)}}
+.descer a:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.descer.some{opacity:0;visibility:hidden}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.descer svg{animation:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="back" href="./"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Voltar ao app</a>
+
+  <div class="tit">
+    <h1>Privacidade</h1>
+    <p>Atualizada em 28 de outubro de 2026</p>
+  </div>
+
+  <section class="hero">
+    <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></i>
+    <p><b>Seus dados ficam só no seu celular.</b>O Meu Mês não coleta, não vê e não envia nada do que você coloca nele.</p>
+  </section>
+
+  <section class="card" id="guarda">
+    <h2>O que o app guarda</h2>
+    <p>Só o que você digita: os números que você coloca como salário, gastos e metas, os nomes dos gastos e algumas escolhas de uso, como ter fechado o aviso de instalar.</p>
+    <p>São anotações, como numa planilha. <b>O app não mexe no seu dinheiro de verdade.</b></p>
+    <p>Tudo fica guardado no navegador do seu aparelho, só pra o app funcionar. <b>Ninguém mais tem acesso a essas anotações, nem quem fez o app.</b></p>
+  </section>
+
+  <section class="card">
+    <h2>O que o app não faz</h2>
+    <ul class="nao">
+      <li>Não mexe no seu dinheiro: não se conecta a banco, cartão nem Pix.</li>
+      <li>Não tem conta, login nem cadastro.</li>
+      <li>Não usa cookies.</li>
+      <li>Não tem anúncios, rastreadores nem estatísticas de uso.</li>
+      <li>Não usa serviços de outras empresas: até as fontes das letras ficam no próprio app.</li>
+      <li>Não vende nem compartilha dados com ninguém.</li>
+    </ul>
+    <p>O app também é configurado pra não conseguir enviar dados pra outros sites.</p>
+  </section>
+
+  <section class="card">
+    <h2>Internet</h2>
+    <p>A internet só serve pra abrir o app e baixar as atualizações. Depois de instalado, ele funciona até sem internet.</p>
+    <p>O site fica hospedado no GitHub Pages. Como qualquer hospedagem, o GitHub registra o endereço IP de quem acessa, por segurança. Esse registro fica com o GitHub e segue a <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">política de privacidade do GitHub</a>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Cópia de segurança</h2>
+    <p>Se você usar <b>Salvar cópia</b>, o app cria um arquivo com tudo o que você anotou, e é você quem escolhe pra onde ele vai (Drive, WhatsApp, Arquivos). O arquivo não tem senha: guarde num lugar só seu.</p>
+    <p><b>Restaurar cópia</b> lê o arquivo só no seu celular.</p>
+  </section>
+
+  <section class="card">
+    <h2>Como apagar seus dados</h2>
+    <p>Pra apagar tudo, limpe os dados do site nas configurações do navegador (em Privacidade ou em Configurações de sites). Sem uma cópia salva, não dá pra recuperar depois.</p>
+  </section>
+
+  <section class="card">
+    <h2>Seus direitos (LGPD)</h2>
+    <p>Como o Meu Mês não recebe nenhum dado seu, não existe registro sobre você com quem fez o app pra consultar, corrigir ou excluir. Tudo fica com você, no seu aparelho, e você pode ver, mudar ou apagar quando quiser.</p>
+  </section>
+
+  <section class="card">
+    <h2>Mudanças nesta página</h2>
+    <p>Se um dia o app mudar o jeito de cuidar dos dados, por exemplo ganhando login ou sincronização, esta página muda antes, com a nova data lá em cima.</p>
+  </section>
+
+  <section class="card">
+    <h2>Contato</h2>
+    <p class="pede">Dúvidas ou sugestões? Mande um e-mail:</p>
+    <p><a class="mail" href="mailto:meumes.financeiro@gmail.com?subject=Meu%20M%C3%AAs">meumes.financeiro@gmail.com</a></p>
+  </section>
+
+  <a class="back fim" href="./"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Voltar ao app</a>
+</main>
+<div class="descer"><a href="#guarda" aria-label="Descer a página"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
+<script src="privacidade.js"></script>
+</body>
+</html>
