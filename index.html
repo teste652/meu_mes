@@ -365,6 +365,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .lembrete p{margin:0;font-size:.88rem;font-weight:600;line-height:1.35}
 .lembrete .x{grid-row:span 2;align-self:start;margin-top:-4px}
 .lembrete .sim{grid-column:2;justify-self:start;background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:9px 15px;font-weight:700;font-size:.86rem}
+/* o mês virou: o mesmo cartão do lembrete, com o nome do mês em cima da pergunta e dois botões */
+.virada .li{background:var(--hero);color:var(--hero-ink)}
+.virada p b{display:block;font-family:var(--display);font-size:1.02rem;font-weight:800}
+.virada .acoes{grid-column:2;display:flex;flex-wrap:wrap;gap:8px}
+.virada .mudar{background:var(--surface-2);border-radius:var(--r-pill);padding:9px 15px;font-weight:700;font-size:.86rem}
+/* o salário com o lápis também no mês aberto em Meses */
+.res .sal-btn{background:rgba(0,0,0,.2);margin-bottom:2px}
 
 /* metas salvas */
 .metas{display:flex;flex-direction:column;gap:8px;margin-top:14px}
@@ -387,7 +394,11 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .instalado .save:not(.erro)+.copia:not(.novo),.instalado .save:not(.erro)+.copia #bkSalvar,.instalado .save:not(.erro)+.copia #bkSalvar+span{display:none}
 /* link da privacidade: fica sempre, até no app instalado */
 .priv{margin:-18px 0 0;text-align:center;font-size:.78rem}
-.priv a{display:inline-block;padding:8px 6px;font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.priv a,.priv button{display:inline-block;padding:8px 6px;font-weight:700;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.priv span{color:var(--muted)}
+/* apagar o histórico: o texto diz o que some e o botão fica na cor de alerta */
+.aviso-txt{margin:0;color:var(--muted);font-size:.95rem;line-height:1.5}
+.go.perigo{background:var(--bad);color:var(--accent-ink)}
 </style>
 
 </head>
@@ -417,6 +428,21 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     <div class="bar" aria-hidden="true"><span class="b-fix" id="bFix"></span></div>
     <div class="legend"><span><i class="i-fix"></i>Gastos do mês <span class="num" id="lFix"></span></span></div>
   </section>
+
+  <!-- o mês virou: pergunta se o salário continua o mesmo -->
+  <div class="lembrete virada" id="virada" hidden>
+    <span class="li"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
+    <p id="viradaTx"></p>
+    <button class="x press" type="button" id="viradaX" aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="acoes"><button class="sim press" type="button" id="viradaSim">Continua</button><button class="mudar press" type="button" id="viradaMudar">Mudar</button></div>
+  </div>
+
+  <!-- o ano virou e o histórico passou do ano passado: avisa antes de tirar os meses mais antigos -->
+  <div class="lembrete virada" id="viradaAno" hidden>
+    <span class="li"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5"/><path d="M12 7.5V12l3 2"/></svg></span>
+    <p id="anoTx"></p>
+    <div class="acoes"><button class="sim press" type="button" id="anoOk">Entendi</button><button class="mudar press" type="button" id="anoCopia">Salvar cópia</button></div>
+  </div>
 
   <div class="example" id="exBox" hidden>
     <span>Valores de <b>exemplo</b></span>
@@ -455,7 +481,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
   <section class="card">
     <div class="sec-head">
       <div class="grow">
-        <h2>Próximos meses</h2>
+        <h2>Meses</h2>
       </div>
     </div>
     <div class="plan-body">
@@ -484,7 +510,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     <button type="button" class="press" id="bkSalvar">Salvar cópia</button><span aria-hidden="true">·</span><button type="button" class="press" id="bkAbrir">Restaurar cópia</button><span id="instLinkBox" hidden><span aria-hidden="true">·</span><button type="button" class="press" id="instLink">Instalar app</button></span>
     <input type="file" id="bkArq" accept=".json,application/json" hidden>
   </div>
-  <p class="priv"><a href="privacidade.html">Privacidade</a></p>
+  <p class="priv"><span id="histBox" hidden><button type="button" class="press" id="histApagar">Apagar histórico</button><span aria-hidden="true">·</span></span><a href="privacidade.html">Privacidade</a></p>
 </div>
 
 <nav class="dock"><div class="in">
@@ -618,6 +644,25 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     </div>
     <button class="go press" type="submit">Salvar salário</button>
   </form>
+</div>
+
+<!-- apagar o histórico: duas confirmações, a segunda por cima da primeira -->
+<div class="sheet" id="sheetHist" role="dialog" aria-modal="true" aria-labelledby="hTitle">
+  <div class="in">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="hTitle">Apagar histórico</h3></div>
+    <p class="aviso-txt" id="hTx"></p>
+    <button class="go perigo press" type="button" id="hSim">Apagar histórico</button>
+  </div>
+</div>
+<div class="sheet" id="sheetHist2" role="dialog" aria-modal="true" aria-labelledby="h2Title">
+  <div class="in">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="h2Title">Tem certeza?</h3></div>
+    <p class="aviso-txt">Não dá pra desfazer. Se quiser guardar esses meses, salve uma cópia antes.</p>
+    <button class="go perigo press" type="button" id="hCerteza">Sim, apagar</button>
+    <button class="ver-todos press soft" type="button" id="hCopia">Salvar cópia antes</button>
+  </div>
 </div>
 
 <div class="sheet" id="sheetMes" role="dialog" aria-modal="true" aria-labelledby="mTitle">

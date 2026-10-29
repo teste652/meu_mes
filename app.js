@@ -62,7 +62,9 @@ const mesLongo=(y,m)=>new Date(y,m,1).toLocaleDateString('pt-BR',{month:'long',y
 const mesCurto=(y,m)=>new Date(y,m,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.','').replace(' de ','/');
 const taxa=v=>{const n=parseFloat(String(v||'').replace(',','.'));return isFinite(n)&&n>0?n/100:0};
 const idxMes=(y,m)=>y*12+m;
-const MES_ATUAL=ym(Y0,M0);
+const MES_ATUAL=ym(Y0,M0), MES_ANTERIOR=ym(Y0,M0-1), JANEIRO_PASSADO=ym(Y0-1,0);
+// "novembro" (de outro ano: "dezembro de 2025")
+const mesNome=(y,m)=>{const d=new Date(y,m,1);return d.toLocaleDateString('pt-BR',{month:'long'})+(d.getFullYear()!==Y0?' de '+d.getFullYear():'')};
 // Projetos conta como investir na barra do grupo, mas o lembrete de guardar só some com Guardar ou Investimentos
 const guarda=c=>c==='reserva'||c==='investir';
 /* ---------- metas ---------- */
@@ -75,19 +77,33 @@ function metaInfo(t){
   return {...p,tem:Math.min(b,t.valor),feita:p.ok&&passou>=p.n,fim:{y:Math.floor(fim/12),m:fim%12}}}
 // o valor do mês entra nos gastos como Guardar (ou Investimentos, se rende) só até a meta ser batida
 function itemDaMeta(t,id){const p=planoMeta(t),r=+t.taxa||0;
-  return {id,nome:t.nome,valor:t.mensal,cat:r?'investir':'reserva',meta:t.id,inicio:t.inicio,parcelas:Math.max(1,p.n),...(r?{taxa:r}:{})}}
+  return {id,nome:t.nome,valor:t.mensal,cat:r?'investir':'reserva',meta:t.id,inicio:t.inicio,parcelas:Math.max(1,p.n),criado:MES_ATUAL,...(r?{taxa:r}:{})}}
+// o salário é de cada mês (salarios: {'2026-10':1000}); 'comeco' é o primeiro mês do histórico
 const EXEMPLO=()=>{const c=(id,nome,valor)=>({id,nome,valor,cat:'contas'}),
   meta={id:'t1',nome:'Reserva de emergência',valor:5000,mensal:300,ja:1200,inicio:MES_ATUAL};
-  return {exemplo:true,salario:3500,metas:[meta],
+  return {exemplo:true,salarios:{[MES_ATUAL]:3500},comeco:MES_ATUAL,metas:[meta],
   fixos:[c('e1','Aluguel',950),c('e2','Luz',160),c('e3','Água',85),c('e4','Internet',100),{id:'e5',nome:'Passe de ônibus',valor:220,cat:'transporte'},{id:'e6',nome:'Mercado',valor:600,cat:'comida'},{id:'e7',nome:'Tênis novo',valor:70,cat:'compras',parcelas:4,inicio:MES_ATUAL},itemDaMeta(meta,'e8')]}};
+const VAZIO=()=>({exemplo:false,salarios:{},comeco:MES_ATUAL,fixos:[],metas:[]});
 let S=EXEMPLO();
-// gasto parcelado só conta nos meses das parcelas
-function ativo(f,y,m){if(f.mes){const u=ymParse(f.mes);return !!u&&u.y===y&&u.m===m}
-  if(!f.parcelas||!f.inicio)return true;const i=ymParse(f.inicio);if(!i)return true;const d=idxMes(y,m)-idxMes(i.y,i.m);return d>=0&&d<f.parcelas}
+const todoMes=f=>!f.mes&&!(f.parcelas&&f.inicio);
+// gasto parcelado só conta nos meses das parcelas. Qualquer gasto pode valer só 'desde' um mês e 'ate' outro:
+// é assim que uma mudança vale daqui pra frente e os meses que passaram ficam como estavam
+function ativo(f,y,m){const k=idxMes(y,m), de=ymParse(f.desde), ate=ymParse(f.ate);
+  if(de&&k<idxMes(de.y,de.m)||ate&&k>idxMes(ate.y,ate.m))return false;
+  if(f.mes){const u=ymParse(f.mes);return !!u&&u.y===y&&u.m===m}
+  if(!f.parcelas||!f.inicio)return true;const i=ymParse(f.inicio);if(!i)return true;const d=k-idxMes(i.y,i.m);return d>=0&&d<f.parcelas}
 const fixosDoMes=(y,m)=>S.fixos.filter(f=>ativo(f,y,m));
 // some da lista o que já ficou pra trás (continua salvo)
-function acabou(f){const agora=idxMes(Y0,M0);if(f.mes){const u=ymParse(f.mes);return !!u&&idxMes(u.y,u.m)<agora}
+function acabou(f,agora=idxMes(Y0,M0)){const ate=ymParse(f.ate);if(ate&&idxMes(ate.y,ate.m)<agora)return true;
+  if(f.mes){const u=ymParse(f.mes);return !!u&&idxMes(u.y,u.m)<agora}
   if(f.parcelas&&f.inicio){const i=ymParse(f.inicio);return !!i&&idxMes(i.y,i.m)+f.parcelas-1<agora}return false}
+// o gasto foi lançado num mês que já passou (os de versões antigas do app também) e valeu em algum mês do histórico:
+// mexer nele não muda esses meses
+function congelado(f){if(f.criado&&f.criado>=MES_ATUAL)return false;
+  const c=ymParse(S.comeco);for(let k=c?idxMes(c.y,c.m):idxMes(Y0,M0);k<idxMes(Y0,M0);k++)if(ativo(f,Math.floor(k/12),k%12))return true;
+  return false}
+// o salário de cada mês: o mês que já tem o seu usa ele; os próximos seguem o último que tiver
+function salarioDe(y,m,s=S){const k=ym(y,m);let v=0,q='';for(const [c,x] of Object.entries(s.salarios))if(c<=k&&c>q){q=c;v=x}return v}
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // embaixo do nome: a área e, no parcelado, em que parcela está
 function subInfo(x){let t=CAT[x.cat].n;
@@ -133,29 +149,42 @@ function usadoNoMes(){const u=Object.fromEntries(CATS.map(c=>[c.k,0]));fixosDoMe
 
 /* ---------- render ---------- */
 function render(){
-  const fx=sum(fixosDoMes(Y0,M0)), semSal=!S.salario, livre=S.salario-fx;
-  $('#salTxt').textContent=semSal?'':fmt(S.salario);
+  const sal=salarioDe(Y0,M0), fx=sum(fixosDoMes(Y0,M0)), semSal=!sal, livre=sal-fx;
+  $('#salTxt').textContent=semSal?'':fmt(sal);
   $('#livre').hidden=semSal;$('#addSal').hidden=!semSal;$('#salBtn').hidden=semSal;
   if(!semSal)tween($('#livre'),livre);
   $('#lFix').textContent=fmt(fx);
-  $('#bFix').style.width=(fx/Math.max(S.salario,fx,1)*100)+'%';
+  $('#bFix').style.width=(fx/Math.max(sal,fx,1)*100)+'%';
   $('#hero').classList.toggle('neg',!semSal&&livre<0);
   $('#livreLbl').textContent=livre<0?'Passou do salário em':'Ainda pode gastar';$('#livreLbl').hidden=semSal;
   $('#exBox').hidden=!S.exemplo;
-  $('.copia').classList.toggle('novo',S.exemplo||!(S.salario||S.fixos.length||S.metas.length));
-  renderLembrete(livre);
+  $('.copia').classList.toggle('novo',S.exemplo||!(sal||S.fixos.length||S.metas.length));
+  renderVirada(sal);
+  renderAno();
+  renderLembrete(sal,livre);
 
-  renderOnde(usadoNoMes());
+  renderOnde(usadoNoMes(),sal);
   renderList(S.fixos.filter(x=>!acabou(x)));
   renderMetas();
+  $('#histBox').hidden=S.exemplo||!(S.comeco<MES_ATUAL);
 }
+// os anos que ainda estão no histórico mas já são de antes do ano passado ("2026", "2026 e 2027")
+function anosVelhos(){const c=ymParse(S.comeco);if(!c||!(S.comeco<JANEIRO_PASSADO))return '';
+  const a=c.y,b=Y0-2;return a===b?`${a}`:b===a+1?`${a} e ${b}`:`${a} a ${b}`}
+// o ano virou e o histórico passou do ano passado: avisa antes, e os meses mais antigos só saem no Entendi
+function renderAno(){const v=S.exemplo?'':anosVelhos();$('#viradaAno').hidden=!v;
+  if(v)$('#anoTx').innerHTML=`<b>${Y0} começou</b>O Meu Mês guarda só o ano passado e este. Os meses de ${v} vão sair do histórico.`}
+// o mês virou: pergunta se o salário continua o mesmo, até a pessoa responder ou fechar
+function renderVirada(sal){
+  const ver=!S.exemplo&&S.aviso===MES_ATUAL&&sal>0, n=mesNome(Y0,M0);
+  $('#virada').hidden=!ver;if(ver)$('#viradaTx').innerHTML=`<b>${n[0].toUpperCase()+n.slice(1)} começou</b>Seu salário continua <span class="num">${fmtS(sal)}</span>?`}
 // some quando o mês já tem algo pra guardar, quando não sobra nada ou quando a pessoa fecha
-function renderLembrete(livre){
-  const v=Math.floor(Math.min(S.salario*.1,livre)/10)*10, tem=fixosDoMes(Y0,M0).some(f=>guarda(f.cat));
-  const ver=!S.exemplo&&S.salario>0&&!tem&&S.lembrete!==MES_ATUAL&&v>=10;
+function renderLembrete(sal,livre){
+  const v=Math.floor(Math.min(sal*.1,livre)/10)*10, tem=fixosDoMes(Y0,M0).some(f=>guarda(f.cat));
+  const ver=!S.exemplo&&sal>0&&!tem&&S.lembrete!==MES_ATUAL&&v>=10;
   $('#lembrete').hidden=!ver;if(ver){$('#lemSim').textContent=`Separar ${fmt0(v)} por mês`;$('#lemSim').dataset.v=v}}
 // rosca com as maiores áreas do mês e, embaixo, quanto do salário vai pra cada grupo
-function renderOnde(usado){
+function renderOnde(usado,sal){
   const box=$('#onde'), tot=CATS.reduce((t,c)=>t+usado[c.k],0);
   if(!tot)box.innerHTML='<div class="empty">Seus gastos por área aparecem aqui</div>';
   else{
@@ -167,12 +196,12 @@ function renderOnde(usado){
     box.innerHTML=`<div class="donut"><svg viewBox="0 0 132 132" aria-hidden="true"><circle r="${r}" cx="66" cy="66" stroke="var(--line)"/>${arcos}</svg><div class="c"><b>${fmt0(tot)}</b><span>no mês</span></div></div>
       <ul class="leg-onde">${fat.map(f=>`<li><i style="background:${f.cor}"></i><b>${f.n}</b><small>${Math.round(f.v/tot*100)}%</small></li>`).join('')}</ul>`;
   }
-  const gr=$('#grupos');gr.hidden=!S.salario||!tot;
+  const gr=$('#grupos');gr.hidden=!sal||!tot;
   if(gr.hidden)return;
   // uma barra por grupo: a barra inteira é o salário e enche até a porcentagem que o grupo leva, sem meta e sem valor.
   // Um gasto pequeno que não chega a 1% aparece como <1% (e um risquinho na barra), não 0%; passando do salário a barra fica cheia e em alerta
   gr.innerHTML=`<div class="lbl">Do salário</div>${GRUPOS.map(x=>{
-    const real=CATS.filter(c=>c.g===x.g).reduce((t,c)=>t+usado[c.k],0), pc=real/S.salario*100;
+    const real=CATS.filter(c=>c.g===x.g).reduce((t,c)=>t+usado[c.k],0), pc=real/sal*100;
     return `<div class="gb${pc>100?' over':''}"><div class="gl"><span>${x.n}</span><b class="num">${real>0&&pc<.5?'&lt;1':Math.round(pc)}%</b></div>
       <div class="gt"><span style="width:${real>0?Math.min(100,Math.max(pc,1.5)):0}%"></span></div></div>`}).join('')}`;
 }
@@ -206,17 +235,18 @@ $('#fixMais').onclick=()=>{verTodos=!verTodos;render()};
 /* ---------- salvar ---------- */
 let saveTimer=null;
 const SALVO='Seus dados ficam salvos só neste celular';
+// o 'salario' de antes (um só) continua indo junto, com o deste mês, pra uma versão antiga do app ainda conseguir abrir
+const comSalario=()=>({...S,salario:salarioDe(Y0,M0)});
 // se o celular não deixar salvar (memória cheia, por exemplo), avisa em vez de fingir que salvou
-function persist(){
-  clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{
-    let ok=true;try{localStorage.setItem('meu-mes',JSON.stringify(S))}catch(e){ok=false}
-    const el=$('#saveTxt');el.textContent=ok?SALVO:'Não deu pra salvar neste celular. Use Salvar cópia pra não perder nada';el.classList.toggle('erro',!ok);
-    if(!ok)toast('Não deu pra salvar neste celular');
-  },500);
+function salvar(){
+  clearTimeout(saveTimer);saveTimer=null;
+  let ok=true;try{localStorage.setItem('meu-mes',JSON.stringify(comSalario()))}catch(e){ok=false}
+  const el=$('#saveTxt');el.textContent=ok?SALVO:'Não deu pra salvar neste celular. Use Salvar cópia pra não perder nada';el.classList.toggle('erro',!ok);
+  if(!ok)toast('Não deu pra salvar neste celular');
 }
+function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(salvar,500)}
 // a primeira mudança de verdade apaga os exemplos, pra não misturar com os dados da pessoa
-function change(fn,msg,desfazer){const ex=S.exemplo;if(ex)S={exemplo:false,salario:0,fixos:[],metas:[]};
+function change(fn,msg,desfazer){const ex=S.exemplo;if(ex)S=VAZIO();
   fn();S.exemplo=false;render();persist();if(ex)msg=msg?msg+' · exemplos apagados':'Exemplos apagados';if(msg)toast(msg,ex?null:desfazer)}
 let migrou=false;
 // o que vem do celular ou de um arquivo de cópia só entra no formato que o próprio app cria:
@@ -233,6 +263,7 @@ function gastoValido(x,ids){
   const g={id,nome:texto(x.nome,CAT[x.cat].n),valor:positivo(x.valor),cat:x.cat};
   if(ehMes(x.mes))g.mes=x.mes;
   else if(ehMes(x.inicio)&&Number.isInteger(p)&&p>=1&&p<=600){g.parcelas=p;g.inicio=x.inicio;if(x.vence===1)g.vence=1}
+  ['desde','ate','criado'].forEach(k=>{if(ehMes(x[k]))g[k]=x[k]});
   if(positivo(x.taxa))g.taxa=positivo(x.taxa);
   if(ehId(x.meta))g.meta=x.meta;
   if(Number.isInteger(dia)&&dia>=1&&dia<=31){g.dia=dia;if(ehMes(x.pago))g.pago=x.pago}
@@ -241,14 +272,33 @@ function metaValida(t){
   if(!t||typeof t!=='object'||!ehId(t.id)||!positivo(t.valor)||!positivo(t.mensal))return null;
   return {id:t.id,nome:texto(t.nome,'Minha meta'),valor:positivo(t.valor),mensal:positivo(t.mensal),ja:positivo(t.ja),
     ...(ehMes(t.inicio)?{inicio:t.inicio}:{}),...(positivo(t.taxa)?{taxa:positivo(t.taxa)}:{})}}
-// versões antigas tinham simulações: as deste mês viram gastos deste mês, pra o saldo não mudar
+// versões antigas tinham simulações: as deste mês viram gastos deste mês, pra o saldo não mudar.
+// E tinham um salário só: ele vira o salário do mês passado em diante (o app começou em outubro de 2026, então nunca antes disso)
 function ler(d){if(!d||typeof d!=='object'||typeof d.salario!=='number'||!isFinite(d.salario)||!Array.isArray(d.fixos))return null;
   if(d.exemplo)return EXEMPLO();
   const ids=new Set(), fixos=d.fixos.map(x=>gastoValido(x,ids)).filter(Boolean), sims=Array.isArray(d.sims)?d.sims:[];
   sims.filter(x=>x&&(!x.mes||x.mes===MES_ATUAL)).forEach(x=>{const g=gastoValido({id:x.id,nome:x.nome,valor:x.valor,cat:x.cat,mes:MES_ATUAL},ids);if(g)fixos.push(g)});
   const vistas=new Set(), metas=(Array.isArray(d.metas)?d.metas:[]).map(metaValida).filter(t=>t&&!vistas.has(t.id)&&vistas.add(t.id)).slice(0,3);
-  return {exemplo:false,salario:d.salario,fixos,metas,...(ehMes(d.lembrete)?{lembrete:d.lembrete}:{})}}
-function load(d){const n=ler(d);if(!n)return false;S=n;migrou=!d.exemplo&&Array.isArray(d.sims)&&d.sims.length>0;return true}
+  const tem=d.salarios&&typeof d.salarios==='object', salarios={};
+  if(tem)Object.keys(d.salarios).forEach(k=>{const v=num(d.salarios[k]);if(ehMes(k)&&v>=0&&isFinite(v))salarios[k]=v});
+  const comeco=ehMes(d.comeco)?d.comeco:tem?MES_ATUAL:MES_ANTERIOR>'2026-10'?MES_ANTERIOR:'2026-10';
+  if(!tem&&d.salario>0)salarios[comeco]=d.salario;
+  const n={exemplo:false,salarios,comeco,fixos,metas,...(ehMes(d.lembrete)?{lembrete:d.lembrete}:{}),...(ehMes(d.aviso)?{aviso:d.aviso}:{})};
+  virar(n);return n}
+// o mês virou desde a última vez que o app abriu: os meses que passaram sem abrir ficam com o último salário,
+// e o deste mês também, até a pessoa dizer se continua
+function virar(s){const ks=Object.keys(s.salarios).sort(), u=ks[ks.length-1];if(!u||u>=MES_ATUAL)return;
+  const v=s.salarios[u], i=ymParse(u), hoje=idxMes(Y0,M0);
+  for(let k=Math.max(idxMes(i.y,i.m)+1,hoje-120);k<=hoje;k++)s.salarios[ym(Math.floor(k/12),k%12)]=v;
+  if(v>0)s.aviso=MES_ATUAL}
+// o histórico passa a começar em 'corte': o que é de antes sai (o salário desses meses e o gasto que já tinha acabado).
+// O histórico guarda só o ano passado e o atual: na virada do ano um aviso diz o que vai sair, e sai no Entendi
+function aparar(s,corte){if(!(s.comeco<corte))return;
+  const c=ymParse(corte);if(!(corte in s.salarios))s.salarios[corte]=salarioDe(c.y,c.m,s);
+  Object.keys(s.salarios).forEach(k=>{if(k<corte)delete s.salarios[k]});
+  s.fixos=s.fixos.filter(f=>!acabou(f,idxMes(c.y,c.m)));s.comeco=corte}
+function load(d){const n=ler(d);if(!n)return false;S=n;
+  migrou=!d.exemplo&&(Array.isArray(d.sims)&&d.sims.length>0||!d.salarios||n.aviso!==d.aviso||n.comeco!==d.comeco);return true}
 try{load(JSON.parse(localStorage.getItem('meu-mes')||'null'))}catch(e){}
 $('#saveTxt').textContent=SALVO;
 render();
@@ -292,8 +342,12 @@ function itemDoForm(v){
   const mesSel=$('#gInicio').value||MES_ATUAL;
   if(gPag==='parc')item={...item,valor:valorParcela(v),parcelas:gN,inicio:mesSel,...(gVence?{vence:1}:{})};
   else if(gPag==='unico')item.mes=mesSel;
-  else if(editando&&editando.taxa)item.taxa=editando.taxa;
+  else{if(editando&&editando.taxa)item.taxa=editando.taxa;
+    // o de todo mês vale deste mês em diante; editando, continua valendo de quando já valia
+    const de=editando&&editando.todo?editando.desde:MES_ATUAL;if(de)item.desde=de}
   if(editando&&editando.dia){item.dia=editando.dia;if(editando.pago)item.pago=editando.pago}
+  // o mês em que foi lançado (editar não muda: continua sendo o mesmo gasto)
+  const cr=editando?editando.criado:MES_ATUAL;if(cr)item.criado=cr;
   return item}
 const SETA='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 // os botões do vencimento dizem o mês: o mesmo do dinheiro ou o seguinte
@@ -317,11 +371,12 @@ function gParc(){
 // no lugar das simulações: enquanto digita, mostra quanto sobra no mês em que o gasto cai
 function depois(){
   const v=parse($('#gValor').value), el=$('#gDepois');el.className='depois';
-  if(!v||!S.salario||S.exemplo){el.textContent='';return}
+  if(!v||S.exemplo){el.textContent='';return}
   const item=itemDoForm(v), i=ymParse(item.mes||item.inicio)||{y:Y0,m:M0};
-  const alvo=gPag==='mes'||idxMes(i.y,i.m)<idxMes(Y0,M0)?{y:Y0,m:M0}:i;
+  const alvo=gPag==='mes'||idxMes(i.y,i.m)<idxMes(Y0,M0)?{y:Y0,m:M0}:i, sal=salarioDe(alvo.y,alvo.m);
+  if(!sal){el.textContent='';return}
   const outros=S.fixos.filter(f=>(!editando||f.id!==editando.id)&&ativo(f,alvo.y,alvo.m));
-  const sobra=S.salario-sum(outros)-(ativo(item,alvo.y,alvo.m)?item.valor:0);
+  const sobra=sal-sum(outros)-(ativo(item,alvo.y,alvo.m)?item.valor:0);
   const quando=idxMes(alvo.y,alvo.m)===idxMes(Y0,M0)?'neste mês':`em ${mesLongo(alvo.y,alvo.m)}`;
   if(sobra<0){el.classList.add('neg');el.innerHTML=`Passa do salário em <b>${fmt(-sobra)}</b> ${quando}`}
   else el.innerHTML=`Sobram <b>${fmt(sobra)}</b> ${quando}`}
@@ -410,7 +465,7 @@ function proximo(){
 $('#gProx').onclick=proximo;
 // abre a janela vazia ou preenchida pra editar
 function abrirGasto(id){const x=id?S.fixos.find(x=>x.id===id):null;
-  editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago}:null;
+  editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado}:null;
   $('#gValor').value=x?String(x.valor).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
@@ -432,14 +487,30 @@ $('#gForm').onsubmit=e=>{e.preventDefault();const v=parse($('#gValor').value);
   if(gPag==='parc')msg=`${gN}x de ${fmt(item.valor)} adicionado`;
   else if(gPag==='unico'){const u=ymParse(item.mes);msg=idxMes(u.y,u.m)===idxMes(Y0,M0)?'Gasto adicionado neste mês':`Gasto adicionado em ${mesCurto(u.y,u.m)}`}
   if(ed)msg='Gasto atualizado';
-  closeSheets();setTimeout(()=>change(()=>{const i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;if(i>=0)S.fixos[i]=item;else S.fixos.push(item)},msg),250)};
-// apagar fica dentro da janela de editar (menos risco de apagar sem querer) e pode ser desfeito
-$('#gDel').onclick=()=>{const ed=editando, i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;if(i<0)return;const item=S.fixos[i];
-  closeSheets();setTimeout(()=>change(()=>{S.fixos.splice(i,1)},'Gasto apagado',()=>change(()=>{S.fixos.splice(i,0,item)},'Voltou')),250)};
-const openSal=()=>{$('#sValor').value=S.salario?String(S.salario).replace('.',','):'';open('#sheetSal')};
-$('#salBtn').onclick=openSal;$('#addSal').onclick=openSal;
-$('#sForm').onsubmit=e=>{e.preventDefault();const v=parse($('#sValor').value);closeSheets();setTimeout(()=>change(()=>{S.salario=v},'Salário atualizado'),250)};
-$('#exClear').onclick=()=>{change(()=>{S={exemplo:false,salario:0,fixos:[],metas:[]}});openSal()};
+  // o de todo mês que já valia nos meses que passaram: o valor (ou o jeito de pagar) novo vale deste mês em diante
+  // e esses meses continuam com o de antes
+  const velho=ed&&S.fixos.find(x=>x.id===ed.id), parte=!!velho&&todoMes(velho)&&congelado(velho)&&(item.valor!==velho.valor||!todoMes(item));
+  if(parte){item.criado=MES_ATUAL;if(!item.mes)item.desde=MES_ATUAL;msg=`Gasto atualizado a partir de ${mesNome(Y0,M0)}`}
+  closeSheets();setTimeout(()=>change(()=>{const i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;
+    if(i<0)S.fixos.push(item);else S.fixos.splice(i,1,...(parte?[{...velho,id:uid(),ate:MES_ANTERIOR}]:[]),item)},msg),250)};
+// apagar fica dentro da janela de editar (menos risco de apagar sem querer) e pode ser desfeito.
+// O que já valia nos meses que passaram sai deste mês em diante: nesses meses ele continua
+$('#gDel').onclick=()=>{const ed=editando, i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;if(i<0)return;const item=S.fixos[i], fica=congelado(item);
+  closeSheets();setTimeout(()=>change(()=>{if(fica)S.fixos[i]={...item,ate:MES_ANTERIOR};else S.fixos.splice(i,1)},fica?`Gasto apagado a partir de ${mesNome(Y0,M0)}`:'Gasto apagado',
+    ()=>change(()=>{if(fica)S.fixos[i]=item;else S.fixos.splice(i,0,item)},'Voltou')),250)};
+// a janela do salário serve pra este mês (os próximos seguem ele) e, lá em Meses, pra um mês que já passou
+let salMes=MES_ATUAL;
+function openSal(k=MES_ATUAL){salMes=k;const p=ymParse(k), v=salarioDe(p.y,p.m), atual=k===MES_ATUAL;
+  $('#sTitle').textContent=atual?'Seu salário':`Salário de ${mesNome(p.y,p.m)}`;
+  $('label[for="sValor"]').textContent=atual?'Quanto cai na conta por mês':`Quanto caiu na conta em ${mesNome(p.y,p.m)}`;
+  $('#sValor').value=v?String(v).replace('.',','):'';open('#sheetSal')}
+$('#salBtn').onclick=()=>openSal();$('#addSal').onclick=()=>openSal();
+// mudar o salário de um mês que passou muda só ele: o mês seguinte fica com o que já tinha
+$('#sForm').onsubmit=e=>{e.preventDefault();const v=parse($('#sValor').value), k=salMes, p=ymParse(k), prox=ym(p.y,p.m+1);
+  closeSheets();setTimeout(()=>change(()=>{
+    if(k<MES_ATUAL&&!(prox in S.salarios))S.salarios[prox]=salarioDe(p.y,p.m+1);
+    S.salarios[k]=v;if(k===MES_ATUAL)delete S.aviso},k===MES_ATUAL?'Salário atualizado':`Salário de ${mesNome(p.y,p.m)} atualizado`),250)};
+$('#exClear').onclick=()=>{change(()=>{S=VAZIO()});openSal()};
 
 function syncMesBtns(){document.querySelectorAll('[data-mes-for]').forEach(b=>{const v=ymParse($('#'+b.dataset.mesFor).value);b.querySelector('span').textContent=v?mesLongo(v.y,v.m):'Escolher mês'})}
 
@@ -457,9 +528,9 @@ $('#mPrev').onclick=()=>{mAno--;desenharMeses()};
 $('#mNext').onclick=()=>{mAno++;desenharMeses()};
 $('#mGrid').onclick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;$('#'+mesAlvo).value=ym(mAno,+b.dataset.m);desenharMeses();setTimeout(()=>{closeSheet($('#sheetMes'));gParc()},160)};
 
-/* ---------- próximos meses ---------- */
+/* ---------- meses: os que passaram e os próximos ---------- */
 let cPag=0, calSel={y:Y0,m:M0};
-function mesInfo(y,m){const itens=fixosDoMes(y,m), sai=sum(itens);return {itens,sai,sobra:S.salario-sai}}
+function mesInfo(y,m){const itens=fixosDoMes(y,m), sai=sum(itens), sal=salarioDe(y,m);return {itens,sai,sal,sobra:sal-sai}}
 /* ---------- metas salvas (até 3) ---------- */
 const br=v=>String(v).replace('.',',');
 function renderMetas(){
@@ -481,7 +552,7 @@ function abrirMeta(id){const t=id?(S.metas||[]).find(x=>x.id===id):null;if(id&&!
   // editar recomeça a conta deste mês, com o que já foi guardado até aqui
   $('#tJa').value=t?br(Math.round(metaInfo(t).tem*100)/100):'';
   $('#tTaxa').value=t&&t.taxa?br(+(t.taxa*100).toFixed(2)):'';
-  $('#tMes').placeholder=S.salario?br(Math.round(S.salario*.1)):'300';
+  const sal=salarioDe(Y0,M0);$('#tMes').placeholder=sal?br(Math.round(sal*.1)):'300';
   $('#tTitle').textContent=t?'Editar meta':'Nova meta';$('#tGo').textContent=t?'Salvar':'Criar meta';$('#tDel').hidden=!t;
   calcMetaForm();open('#sheetMeta');return true}
 function lerMeta(){return {nome:$('#tNome').value.trim()||'Minha meta',valor:parse($('#tValor').value),mensal:parse($('#tMes').value),ja:parse($('#tJa').value),inicio:MES_ATUAL,...(taxa($('#tTaxa').value)?{taxa:taxa($('#tTaxa').value)}:{})}}
@@ -504,8 +575,8 @@ function calcMetaForm(){
   // o mês em destaque e, embaixo, um andar pra cada coisa: quantos meses, quanto por mês, o rendimento (se tiver)
   // e, no fim, quanto sobra (ou passa do salário) neste mês com a meta
   const andar=(nome,v,cls)=>`<div${cls?` class="${cls}"`:''}><span>${nome}</span><b class="num">${v}</b></div>`;
-  let sobra='';
-  if(S.salario&&!S.exemplo){const v=S.salario-sum(fixosDoMes(Y0,M0).filter(f=>!metaEd||f.meta!==metaEd.id))-t.mensal;
+  let sobra='';const sal=salarioDe(Y0,M0);
+  if(sal&&!S.exemplo){const v=sal-sum(fixosDoMes(Y0,M0).filter(f=>!metaEd||f.meta!==metaEd.id))-t.mensal;
     sobra=andar(v<0?'Passa do salário':'Sobra no mês',fmtS(Math.abs(v)),v<0?'fim neg':'fim')}
   box.innerHTML=`<div class="lbl">Você chega lá em</div>
     <div class="big2">${mesLongo(fy,fm)}</div>
@@ -520,17 +591,45 @@ $('#tForm').onsubmit=e=>{e.preventDefault();const t=calcMetaForm();
   const ed=metaEd;t.id=ed?ed.id:uid();
   closeSheets();setTimeout(()=>change(()=>{
     S.metas=S.metas||[];const i=ed?S.metas.findIndex(x=>x.id===ed.id):-1;if(i>=0)S.metas[i]=t;else S.metas.push(t);
-    const j=S.fixos.findIndex(f=>f.meta===t.id), it=itemDaMeta(t,j>=0?S.fixos[j].id:uid());if(j>=0)S.fixos[j]=it;else S.fixos.push(it);
+    // o que a meta guardou nos meses que passaram continua neles; o plano novo vale deste mês em diante
+    const j=S.fixos.findIndex(f=>f.meta===t.id&&!f.ate), velho=S.fixos[j], it=itemDaMeta(t,j>=0?velho.id:uid());
+    if(j<0)S.fixos.push(it);else S.fixos.splice(j,1,...(congelado(velho)?[{...velho,id:uid(),ate:MES_ANTERIOR}]:[]),it);
   },ed?'Meta atualizada':`Meta criada: ${fmt0(t.mensal)} por mês nos gastos`),250)};
 $('#tDel').onclick=()=>{const ed=metaEd;if(!ed)return;
-  const i=S.metas.findIndex(x=>x.id===ed.id), j=S.fixos.findIndex(f=>f.meta===ed.id), t=S.metas[i], it=S.fixos[j];
-  closeSheets();setTimeout(()=>change(()=>{S.metas=S.metas.filter(x=>x.id!==ed.id);S.fixos=S.fixos.filter(f=>f.meta!==ed.id)},'Meta apagada',
-    ()=>change(()=>{if(t)S.metas.splice(i,0,t);if(it)S.fixos.splice(j,0,it)},'Voltou')),250)};
+  const i=S.metas.findIndex(x=>x.id===ed.id), j=S.fixos.findIndex(f=>f.meta===ed.id&&!f.ate), t=S.metas[i], it=S.fixos[j], fica=!!it&&congelado(it);
+  // apagando a meta, o que ela já guardou nos meses que passaram continua neles
+  closeSheets();setTimeout(()=>change(()=>{S.metas=S.metas.filter(x=>x.id!==ed.id);if(fica)S.fixos[j]={...it,ate:MES_ANTERIOR};else if(it)S.fixos.splice(j,1)},'Meta apagada',
+    ()=>change(()=>{if(t)S.metas.splice(i,0,t);if(fica)S.fixos[j]=it;else if(it)S.fixos.splice(j,0,it)},'Voltou')),250)};
 
 /* ---------- lembrete de guardar ---------- */
 $('#lemSim').onclick=e=>{const v=+e.currentTarget.dataset.v, id=uid();if(!v)return;
-  change(()=>{S.fixos.push({id,nome:'Guardar',valor:v,cat:'reserva'})},`${fmt0(v)} por mês pra guardar`,()=>change(()=>{S.fixos=S.fixos.filter(f=>f.id!==id)},'Voltou'))};
+  change(()=>{S.fixos.push({id,nome:'Guardar',valor:v,cat:'reserva',desde:MES_ATUAL,criado:MES_ATUAL})},`${fmt0(v)} por mês pra guardar`,()=>change(()=>{S.fixos=S.fixos.filter(f=>f.id!==id)},'Voltou'))};
 $('#lemX').onclick=()=>change(()=>{S.lembrete=MES_ATUAL});
+
+/* ---------- o mês virou ---------- */
+// Continua e fechar deixam o salário do mês passado (que já está neste mês); Mudar abre a janela do salário
+$('#viradaSim').onclick=()=>change(()=>{delete S.aviso},'Salário mantido');
+$('#viradaX').onclick=()=>change(()=>{delete S.aviso});
+$('#viradaMudar').onclick=()=>openSal();
+// o ano virou: Entendi tira do histórico os meses de antes do ano passado; Salvar cópia guarda tudo num arquivo antes
+$('#anoOk').onclick=()=>{const v=anosVelhos();change(()=>aparar(S,JANEIRO_PASSADO),`Os meses de ${v} saíram do histórico`)};
+$('#anoCopia').onclick=()=>salvarCopia();
+
+/* ---------- apagar o histórico ---------- */
+// fica no rodapé quando tem mês que passou; pede duas confirmações e não tem desfazer.
+// Este mês e o que continua valendo (de todo mês, parcelas, metas) ficam
+$('#histApagar').onclick=()=>{const c=ymParse(S.comeco), a=ymParse(MES_ANTERIOR), n=mesLongo(c.y,c.m);
+  $('#hTx').textContent=(S.comeco===MES_ANTERIOR?`${n[0].toUpperCase()+n.slice(1)} some de Meses, com o salário e os gastos dele.`:`Os meses de ${n} a ${mesLongo(a.y,a.m)} somem de Meses, com o salário e os gastos de cada um.`)
+    +' Este mês e os gastos que continuam, como os de todo mês e as parcelas, ficam.';
+  open('#sheetHist')};
+$('#hSim').onclick=()=>open('#sheetHist2');
+$('#hCopia').onclick=()=>salvarCopia();
+$('#hCerteza').onclick=()=>{closeSheets();setTimeout(()=>change(()=>aparar(S,MES_ATUAL),'Histórico apagado'),250)};
+// no celular o app fica aberto no fundo: se o mês virou enquanto ele estava lá, volta já no mês novo.
+// E saindo do app, o que ainda ia ser salvo é salvo na hora
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){if(saveTimer)salvar();return}
+  const d=new Date();if(ym(d.getFullYear(),d.getMonth())!==MES_ATUAL)location.reload()});
 
 /* ---------- cópia de segurança ---------- */
 // no celular abre o compartilhar (Drive, WhatsApp, Arquivos); no computador baixa o arquivo
@@ -540,10 +639,11 @@ let baixar=async(nome,txt)=>{
     try{await navigator.share({files:[f],title:'Cópia do Meu Mês'});return true}catch(e){if(e.name==='AbortError')return false}}
   const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=nome;document.body.append(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);return true};
-$('#bkSalvar').onclick=async()=>{
+const salvarCopia=async()=>{
   const d=new Date(), dia=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const txt=JSON.stringify({app:'meu-mes',versao:2,salvoEm:d.toISOString(),dados:S},null,1);
+  const txt=JSON.stringify({app:'meu-mes',versao:3,salvoEm:d.toISOString(),dados:comSalario()},null,1);
   try{if(await baixar(`meu-mes-${dia}.json`,txt))toast('Cópia salva')}catch(e){toast('Não deu pra salvar a cópia')}};
+$('#bkSalvar').onclick=salvarCopia;
 $('#bkAbrir').onclick=()=>$('#bkArq').click();
 // restaurar troca tudo pelo que está na cópia, mas dá pra desfazer
 $('#bkArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -557,43 +657,61 @@ $('#bkArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
 // parcela que termina neste mês (o Guardar das metas fica de fora: lá o que conta é bater a meta)
 const ultimaParcela=(f,y,m)=>{if(f.meta||!f.parcelas||!f.inicio)return false;const i=ymParse(f.inicio);return !!i&&idxMes(i.y,i.m)+f.parcelas-1===idxMes(y,m)};
 const metasNoMes=(y,m)=>(S.metas||[]).filter(t=>{const i=metaInfo(t);return i.ok&&!i.feita&&i.fim.y===y&&i.fim.m===m});
+// 6 meses por página e a página 0 começa no mês atual. Pra trás vêm os meses que passaram: a página nunca começa antes
+// do primeiro mês do histórico, e assim continua com 6 meses (a mais antiga pode repetir alguns da seguinte)
+function paginaCal(){const kHoje=idxMes(Y0,M0), c=ymParse(S.comeco), primeiro=Math.min(c?idxMes(c.y,c.m):kHoje,kHoje), ini=Math.max(kHoje+cPag*6,primeiro);
+  return {ini,z:ini+5,antes:ini>primeiro}}
+const LAPIS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>';
 function renderCal(){
-  // 6 meses a partir do mês atual, de página em página: quanto sai em cada um e o que acaba nele
-  const ini=idxMes(Y0,M0)+cPag*6, z=ini+5;
-  $('#cAno').textContent=`${MESES[ini%12]}/${String(Math.floor(ini/12)).slice(2)} – ${MESES[z%12]}/${String(Math.floor(z/12)).slice(2)}`;
-  $('#cPrev').disabled=cPag<=0;$('#cNext').disabled=cPag>=19;
-  const meses=Array.from({length:6},(_,i)=>{const k=ini+i,y=Math.floor(k/12),m=k%12;return {k,y,m,...mesInfo(y,m)}});
-  $('#cGrid').innerHTML=meses.map(x=>{const sel=calSel.y===x.y&&calSel.m===x.m,hoje=x.k===idxMes(Y0,M0),over=S.salario>0&&x.sobra<0;
+  // quanto sai em cada mês e o que acaba nele
+  const kHoje=idxMes(Y0,M0);let pg=paginaCal();
+  // o histórico ficou mais curto (cópia restaurada, histórico apagado): a página de antes já não tem mês que passou
+  if(cPag<0&&pg.ini>=kHoje){cPag=0;pg=paginaCal()}
+  const c0=ymParse(S.comeco);if(c0&&idxMes(calSel.y,calSel.m)<Math.min(idxMes(c0.y,c0.m),kHoje))calSel={y:Y0,m:M0};
+  const {ini,z}=pg, mc=k=>`${MESES[k%12]}/${String(Math.floor(k/12)).slice(2)}`;
+  $('#cAno').textContent=`${mc(ini)} – ${mc(z)}`;
+  $('#cPrev').disabled=!pg.antes;$('#cNext').disabled=cPag>=19;
+  const meses=Array.from({length:z-ini+1},(_,i)=>{const k=ini+i,y=Math.floor(k/12),m=k%12;return {k,y,m,...mesInfo(y,m)}});
+  $('#cGrid').innerHTML=meses.map(x=>{const sel=calSel.y===x.y&&calSel.m===x.m,hoje=x.k===kHoje,over=x.sal>0&&x.sobra<0;
     const fins=x.itens.filter(f=>ultimaParcela(f,x.y,x.m)).length, meta=metasNoMes(x.y,x.m).length;
     // no cartão fica só um pontinho; o que acaba aparece embaixo, ao tocar no mês
     const pontos=(fins?'<i></i>':'')+(meta?'<i class="cmeta"></i>':''), nota=(fins?`, ${fins>1?`${fins} parcelas acabam`:'última parcela'}`:'')+(meta?', bate a meta':'');
     return `<button type="button" class="press${sel?' sel':''}${hoje?' hoje':''}" data-k="${x.k}" aria-pressed="${sel}" aria-label="${mesLongo(x.y,x.m)}: sai ${fmt(x.sai)}${nota}">
       <span class="cm">${MESES[x.m]}${x.y!==Y0?`<small>${String(x.y).slice(2)}</small>`:''}</span>
       <span class="cv num${over?' over':''}"><small>R$</small>${fmt0(x.sai).replace(/^R\$\s?/,'')}</span>
-      ${S.salario?`<span class="cmt"><span class="${over?'over':''}" style="width:${Math.min(100,x.sai/S.salario*100)}%"></span></span>`:''}${pontos?`<span class="cdots" aria-hidden="true">${pontos}</span>`:''}</button>`}).join('');
-  const {y,m}=calSel, inf=mesInfo(y,m), atual=y===Y0&&m===M0;
+      ${x.sal?`<span class="cmt"><span class="${over?'over':''}" style="width:${Math.min(100,x.sai/x.sal*100)}%"></span></span>`:''}${pontos?`<span class="cdots" aria-hidden="true">${pontos}</span>`:''}</button>`}).join('');
+  const {y,m}=calSel, inf=mesInfo(y,m), k=idxMes(y,m), atual=k===kHoje, passou=k<kHoje;
   // em todo mês, também no atual, aparece um por um o que é só daquele mês
   // (parcela, meta, gasto de um mês só) e o que é de todo mês vira uma linha
   // aqui tudo é o que sai: o valor vai sem o sinal de menos e sem o ,00
   const linha=(ic,cor,nome,sub,v,lista)=>`<div><i style="background:${cor}">${ic}</i><span class="t"><span>${nome}</span><small${lista?' class="lista"':''}>${sub}</small></span><b>${fmtS(v)}</b></div>`;
-  const todoMes=x=>!x.mes&&!(x.parcelas&&x.inicio), todo=inf.itens.filter(todoMes);
+  const todo=inf.itens.filter(todoMes);
   const linhas=[...inf.itens.filter(x=>!todoMes(x)).map(x=>{let sub='Só neste mês';
       if(x.meta)sub='Meta';
       else if(x.parcelas){const i=ymParse(x.inicio),n=idxMes(y,m)-idxMes(i.y,i.m)+1;sub=n===x.parcelas?'Última parcela':`Parcela ${n} de ${esc(x.parcelas)}`}
       return linha(svg(x.cat),color(x.cat),esc(x.nome),sub,x.valor)}),
     ...(todo.length?[linha(svg('assinaturas'),'var(--c-outros)','Todo mês',esc(todo.map(x=>x.nome).join(', ')),sum(todo),1)]:[])].join('')||'<p>Nenhum gasto neste mês.</p>';
-  // o resumo do mês numa linha só: quanto sai e quanto sobra (ou falta), e a barra embaixo
-  const neg=S.salario>0&&inf.sobra<0, topoM=Math.max(S.salario,inf.sai,1);
-  $('#cDet').innerHTML=`<div class="lbl">${mesLongo(y,m)}${atual?' · este mês':''}</div>
-    <div class="dres${neg?' neg':''}"><span>Sai <b>${fmt0(inf.sai)}</b></span><span class="sb">${neg?'Falta':'Sobra'} <b>${S.salario?fmt0(Math.abs(inf.sobra)):'—'}</b></span></div>
-    <div class="split-bar" aria-hidden="true"><span class="d-gasto" style="width:${Math.min(inf.sai,S.salario||inf.sai)/topoM*100}%"></span>${neg?`<span class="d-falta" style="width:${(inf.sai-S.salario)/topoM*100}%"></span>`:`<span class="d-sobra" style="width:${Math.max(0,inf.sobra)/topoM*100}%"></span>`}</div>
+  // o resumo do mês numa linha só: quanto sai e quanto sobra (ou falta), e a barra embaixo; num mês que passou, saiu e sobrou
+  const sal=inf.sal, neg=sal>0&&inf.sobra<0, topoM=Math.max(sal,inf.sai,1);
+  // este mês e os que passaram mostram o salário com o lápis, pra corrigir; os próximos seguem o deste mês
+  const salBtn=k>kHoje?'':`<button type="button" class="sal-btn press" data-sal="${ym(y,m)}" aria-label="Editar salário de ${mesNome(y,m)}">
+      <span>${sal?`Salário <span class="num">${fmt(sal)}</span>`:'Colocar salário'}</span>${LAPIS}</button>`;
+  $('#cDet').innerHTML=`<div class="lbl">${mesLongo(y,m)}${atual?' · este mês':k===kHoje-1?' · mês passado':''}</div>
+    ${salBtn}
+    <div class="dres${neg?' neg':''}"><span>${passou?'Saiu':'Sai'} <b>${fmt0(inf.sai)}</b></span><span class="sb">${neg?passou?'Faltou':'Falta':passou?'Sobrou':'Sobra'} <b>${sal?fmt0(Math.abs(inf.sobra)):'—'}</b></span></div>
+    <div class="split-bar" aria-hidden="true"><span class="d-gasto" style="width:${Math.min(inf.sai,sal||inf.sai)/topoM*100}%"></span>${neg?`<span class="d-falta" style="width:${(inf.sai-sal)/topoM*100}%"></span>`:`<span class="d-sobra" style="width:${Math.max(0,inf.sobra)/topoM*100}%"></span>`}</div>
     <div class="mini">${linhas}</div>
     ${metasNoMes(y,m).map(t=>`<p><b>Bate a meta “${esc(t.nome)}”</b></p>`).join('')}`;
   caberDres();
 }
 $('#cGrid').onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=+b.dataset.k;calSel={y:Math.floor(k/12),m:k%12};renderCal()};
-$('#cPrev').onclick=()=>{cPag--;renderCal()};
-$('#cNext').onclick=()=>{cPag++;renderCal()};
+// trocando de página, o mês aberto embaixo vai junto: pra trás, o mês que passou mais perto de hoje;
+// pra frente, o primeiro da página; e na página do mês atual, ele
+function pagina(d){cPag+=d;const {ini,z}=paginaCal(), kHoje=idxMes(Y0,M0), n=cPag>0?ini:cPag<0?Math.min(z,kHoje-1):kHoje;
+  calSel={y:Math.floor(n/12),m:n%12};renderCal()}
+$('#cPrev').onclick=()=>pagina(-1);
+$('#cNext').onclick=()=>pagina(1);
+$('#cDet').onclick=e=>{const b=e.target.closest('[data-sal]');if(b)openSal(b.dataset.sal)};
 const renderBase=render; render=function(){renderBase();renderCal()};
 renderCal();
 })();
