@@ -346,7 +346,8 @@ document.addEventListener('pointerdown',e=>{const b=e.target.closest('.press');i
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pilha.length)closeSheet(pilha[pilha.length-1])});
 
 /* ---------- sheets ---------- */
-let catSel=null, catAuto=false, editando=null;
+// areaVista: a pessoa já passou pela área (tocou numa, ou o Próximo já mostrou a sugerida). Até lá, o Próximo para nela
+let catSel=null, catAuto=false, areaVista=false, editando=null;
 $('#gCats').innerHTML=CATS.map(c=>`<button type="button" class="press" data-cat="${c.k}" aria-pressed="false" style="--cc:${color(c.k)}"><i style="background:${color(c.k)}">${svg(c.k)}</i>${c.n}</button>`).join('');
 // gasto: só um mês, todo mês (água, luz) ou parcelado (o valor é o total e vira parcelas nos meses certos)
 // no parcelado, a primeira parcela pode vencer no mês seguinte ao do dinheiro que paga (gVence=1, salvo como vence:1)
@@ -429,7 +430,7 @@ function repetir(b){let t,i;const parar=()=>{clearTimeout(t);clearInterval(i)};
 ['#gMenos','#gMais'].forEach(id=>repetir($(id)));
 $('#gValor').addEventListener('input',gParc);
 $('#gJuros').addEventListener('input',gParc);
-function setCat(k,auto){catSel=k;catAuto=!!(k&&auto);$('#gCats').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===k));
+function setCat(k,auto){const antes=catSel;catSel=k;catAuto=!!(k&&auto);if(k&&!auto)areaVista=true;else if(auto&&k!==antes)areaVista=false;$('#gCats').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===k));
   const l=$('#gAreaLbl');if(k)l.classList.remove('pick');
   if(!l.classList.contains('pick'))l.textContent=catAuto?'Área sugerida':'Área'}
 // enquanto a pessoa não toca numa área, ela acompanha o que vai sendo escrito
@@ -438,15 +439,15 @@ $('#gNome').addEventListener('input',e=>{if(catSel&&!catAuto)return;const k=area
 const toque=()=>matchMedia('(pointer:coarse)').matches;
 function verAreas(el){if(toque()){document.activeElement?.blur();el.scrollIntoView({block:'nearest',behavior:'smooth'})}else el.focus()}
 function pedirArea(){const l=$('#gAreaLbl');l.classList.add('pick');l.textContent='Escolha a área';verAreas($('#gCats').querySelector('button'))}
-// a área que o app achou pelo nome fica marcada, mas quem confirma é a pessoa: o Enter só mostra, o Próximo segue
+// a área que o app achou pelo nome fica marcada, mas quem confirma é a pessoa: o primeiro Próximo só mostra, o segundo segue
 function mostrarArea(){const b=$('#gCats [aria-pressed="true"]');if(!b)return pedirArea();
-  b.classList.remove('realce');void b.offsetWidth;b.classList.add('realce');verAreas(b)}
-// Enter: valor -> o que é -> área (a pessoa confere a sugerida) -> próximo; na segunda janela, o Enter adiciona
+  areaVista=true;b.classList.remove('realce');void b.offsetWidth;b.classList.add('realce');verAreas(b)}
+// Enter: valor -> o que é -> área (a pessoa confere a sugerida, igual ao botão Próximo) -> próximo; na segunda janela, o Enter adiciona
 $('#gForm').addEventListener('keydown',e=>{
   if(e.key!=='Enter'||e.isComposing)return;
   const t=e.target;
   if(t.id==='gValor'){e.preventDefault();if(!parse(t.value)){toast('Coloque um valor');return}$('#gNome').focus();return}
-  if(t.id==='gNome'){e.preventDefault();mostrarArea();return}
+  if(t.id==='gNome'){e.preventDefault();proximo();return}
   const chip=t.closest&&t.closest('#gCats button');
   if(chip){e.preventDefault();setCat(chip.dataset.cat);proximo()}
 });
@@ -494,10 +495,11 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-back]');if
 $('#scrim').onclick=()=>{if(pilha.length)closeSheet(pilha[pilha.length-1])};
 $('#gCats').onclick=e=>{const b=e.target.closest('button');if(b)setCat(b.dataset.cat)};
 
-// Próximo: com valor e área, abre por cima a janela de como paga
+// Próximo (o botão e o do teclado): primeiro leva pra área, a sugerida ou a escolher; com a área vista, abre por cima a janela de como paga
 function proximo(){
   if(!parse($('#gValor').value)){$('#gValor').focus();toast('Coloque um valor');return}
   if(!catSel){pedirArea();toast('Escolha a área');return}
+  if(!areaVista){mostrarArea();return}
   if(noMes){salvarNoMes();return}
   setPag(gPag);open('#sheetPag','#gGo')}
 $('#gProx').onclick=proximo;
@@ -509,7 +511,7 @@ function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymPars
   // o valor que aparece é o daquele mês (o de todo mês pode ter um valor só daquele mês)
   const mostra=!x?0:noMes?valorEm(x,c.y,c.m):todoMes(x)&&ativo(x,Y0,M0)?valorEm(x,Y0,M0):+x.valor;
   editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado,ctx:c?ctx:null,base:+x.valor,mostra,valores:x.valores}:null;
-  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);
+  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);areaVista=!!x;
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
   $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):c?ctx:MES_ATUAL;
