@@ -16,24 +16,23 @@ const ICONS={
   assinaturas:'<path d="M19.5 10.5A7.5 7.5 0 0 0 6 6.6L4.5 8"/><path d="M4.5 4v4h4"/><path d="M4.5 13.5A7.5 7.5 0 0 0 18 17.4l1.5-1.4"/><path d="M19.5 20v-4h-4"/>'
 };
 const svg=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
-// as áreas do dia a dia, cada uma num grupo: necessidades, vontades ou guardar e investir
+// as áreas do dia a dia
 const CATS=[
-  {k:'contas',n:'Contas da casa',g:'n'},
-  {k:'comida',n:'Comida',g:'n'},
-  {k:'transporte',n:'Transporte',g:'n'},
-  {k:'saude',n:'Saúde',g:'n'},
-  {k:'educacao',n:'Educação',g:'n'},
-  {k:'pessoal',n:'Pessoal',g:'n'},
-  {k:'dividas',n:'Dívidas',g:'n'},
-  {k:'compras',n:'Compras',g:'v'},
-  {k:'lazer',n:'Lazer',g:'v'},
-  {k:'assinaturas',n:'Assinaturas',g:'v'},
-  {k:'projetos',n:'Projetos',g:'g'},
-  {k:'reserva',n:'Guardar',g:'g'},
-  {k:'investir',n:'Investimentos',g:'g'}
+  {k:'contas',n:'Contas da casa'},
+  {k:'comida',n:'Comida'},
+  {k:'transporte',n:'Transporte'},
+  {k:'saude',n:'Saúde'},
+  {k:'educacao',n:'Educação'},
+  {k:'pessoal',n:'Pessoal'},
+  {k:'dividas',n:'Dívidas'},
+  {k:'compras',n:'Compras'},
+  {k:'lazer',n:'Lazer'},
+  {k:'assinaturas',n:'Assinaturas'},
+  {k:'projetos',n:'Projetos'},
+  {k:'reserva',n:'Guardar'},
+  {k:'investir',n:'Investimentos'}
 ];
 const CAT=Object.fromEntries(CATS.map(c=>[c.k,c]));
-const GRUPOS=[{g:'n',n:'Necessidades'},{g:'v',n:'Vontades'},{g:'g',n:'Guardar/investir'}];
 const color=k=>`var(--c-${k})`;
 // o nome quase sempre já diz a área (sem acento e em minúsculas); vale a primeira que bater, então as mais específicas vêm antes
 const PISTAS=[
@@ -65,7 +64,7 @@ const idxMes=(y,m)=>y*12+m;
 const MES_ATUAL=ym(Y0,M0), MES_ANTERIOR=ym(Y0,M0-1), JANEIRO_PASSADO=ym(Y0-1,0);
 // "novembro" (de outro ano: "dezembro de 2025")
 const mesNome=(y,m)=>{const d=new Date(y,m,1);return d.toLocaleDateString('pt-BR',{month:'long'})+(d.getFullYear()!==Y0?' de '+d.getFullYear():'')};
-// Projetos conta como investir na barra do grupo, mas o lembrete de guardar só some com Guardar ou Investimentos
+// o lembrete de guardar só some com Guardar ou Investimentos
 const guarda=c=>c==='reserva'||c==='investir';
 /* ---------- metas ---------- */
 // o plano: guarda 'mensal' todo mês a partir de 'inicio', com rendimento, até chegar no valor
@@ -88,11 +87,19 @@ let S=EXEMPLO();
 const todoMes=f=>!f.mes&&!(f.parcelas&&f.inicio);
 // gasto parcelado só conta nos meses das parcelas. Qualquer gasto pode valer só 'desde' um mês e 'ate' outro:
 // é assim que uma mudança vale daqui pra frente e os meses que passaram ficam como estavam
-function ativo(f,y,m){const k=idxMes(y,m), de=ymParse(f.desde), ate=ymParse(f.ate);
+function noPeriodo(f,y,m){const k=idxMes(y,m), de=ymParse(f.desde), ate=ymParse(f.ate);
   if(de&&k<idxMes(de.y,de.m)||ate&&k>idxMes(ate.y,ate.m))return false;
   if(f.mes){const u=ymParse(f.mes);return !!u&&u.y===y&&u.m===m}
   if(!f.parcelas||!f.inicio)return true;const i=ymParse(f.inicio);if(!i)return true;const d=k-idxMes(i.y,i.m);return d>=0&&d<f.parcelas}
-const fixosDoMes=(y,m)=>S.fixos.filter(f=>ativo(f,y,m));
+// um gasto de todo mês pode ter, num mês, um valor só daquele mês (mudado lá em Meses): valores {'2026-08':190}.
+// O 0 quer dizer que naquele mês ele foi tirado
+const fora=(f,y,m)=>!!f.valores&&f.valores[ym(y,m)]===0;
+const valorEm=(f,y,m)=>{const v=f.valores&&f.valores[ym(y,m)];return v>0?v:+f.valor};
+const ativo=(f,y,m)=>!fora(f,y,m)&&noPeriodo(f,y,m);
+// os gastos de um mês, cada um com o valor daquele mês
+const fixosDoMes=(y,m)=>S.fixos.filter(f=>ativo(f,y,m)).map(f=>f.valores?{...f,valor:valorEm(f,y,m)}:f);
+// só as chaves que passam no teste (sem nenhuma, nada)
+const soChaves=(o,ok)=>{if(!o)return;const r={};Object.keys(o).forEach(k=>{if(ok(k))r[k]=o[k]});return Object.keys(r).length?r:undefined};
 // some da lista o que já ficou pra trás (continua salvo)
 function acabou(f,agora=idxMes(Y0,M0)){const ate=ymParse(f.ate);if(ate&&idxMes(ate.y,ate.m)<agora)return true;
   if(f.mes){const u=ymParse(f.mes);return !!u&&idxMes(u.y,u.m)<agora}
@@ -111,7 +118,12 @@ const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 function subInfo(x){let t=CAT[x.cat].n;
   if(x.parcelas&&x.inicio&&!x.meta){const i=ymParse(x.inicio),d=idxMes(Y0,M0)-idxMes(i.y,i.m);if(i)t+=d<0?` · a partir de ${mesCurto(i.y,i.m)}`:d<x.parcelas?` · ${d+1}/${esc(x.parcelas)}`:''}
   else if(x.mes){const u=ymParse(x.mes);if(u&&idxMes(u.y,u.m)!==idxMes(Y0,M0))t+=` · ${mesCurto(u.y,u.m)}`}
+  else if(fora(x,Y0,M0))t+=' · tirado deste mês';
   return t}
+// o que o gasto é naquele mês: de um mês só, de todo mês, a parcela ou a meta
+function tipoNoMes(x,y,m){if(x.meta)return 'Meta';
+  if(x.parcelas&&x.inicio){const i=ymParse(x.inicio),n=idxMes(y,m)-idxMes(i.y,i.m)+1;return n===x.parcelas?'Última parcela':`Parcela ${n} de ${esc(x.parcelas)}`}
+  return x.mes?'Só neste mês':'Todo mês'}
 const fmt=v=>brl.format(v||0);
 const brl0=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
 const fmt0=v=>brl0.format(Math.round(v||0));
@@ -165,7 +177,7 @@ function render(){
   renderAno();
   renderLembrete(sal,livre);
 
-  renderOnde(usadoNoMes(),sal);
+  renderOnde(usadoNoMes());
   renderList(S.fixos.filter(x=>!acabou(x)));
   renderMetas();
   $('#histBox').hidden=S.exemplo||!(S.comeco<MES_ATUAL);
@@ -185,8 +197,8 @@ function renderLembrete(sal,livre){
   const v=Math.floor(Math.min(sal*.1,livre)/10)*10, tem=fixosDoMes(Y0,M0).some(f=>guarda(f.cat));
   const ver=!S.exemplo&&sal>0&&!tem&&S.lembrete!==MES_ATUAL&&v>=10;
   $('#lembrete').hidden=!ver;if(ver){$('#lemSim').textContent=`Separar ${fmt0(v)} por mês`;$('#lemSim').dataset.v=v}}
-// rosca com as maiores áreas do mês e, embaixo, quanto do salário vai pra cada grupo
-function renderOnde(usado,sal){
+// rosca com as maiores áreas do mês e, embaixo, o botão que abre tudo o que saiu em cada área
+function renderOnde(usado){
   const box=$('#onde'), tot=CATS.reduce((t,c)=>t+usado[c.k],0);
   if(!tot)box.innerHTML='<div class="empty">Seus gastos por área aparecem aqui</div>';
   else{
@@ -198,15 +210,27 @@ function renderOnde(usado,sal){
     box.innerHTML=`<div class="donut"><svg viewBox="0 0 132 132" aria-hidden="true"><circle r="${r}" cx="66" cy="66" stroke="var(--line)"/>${arcos}</svg><div class="c"><b>${fmt0(tot)}</b><span>no mês</span></div></div>
       <ul class="leg-onde">${fat.map(f=>`<li><i style="background:${f.cor}"></i><b>${f.n}</b><small>${Math.round(f.v/tot*100)}%</small></li>`).join('')}</ul>`;
   }
-  const gr=$('#grupos');gr.hidden=!sal||!tot;
-  if(gr.hidden)return;
-  // uma barra por grupo: a barra inteira é o salário e enche até a porcentagem que o grupo leva, sem meta e sem valor.
-  // Um gasto pequeno que não chega a 1% aparece como <1% (e um risquinho na barra), não 0%; passando do salário a barra fica cheia e em alerta
-  gr.innerHTML=`<div class="lbl">Do salário</div>${GRUPOS.map(x=>{
-    const real=CATS.filter(c=>c.g===x.g).reduce((t,c)=>t+usado[c.k],0), pc=real/sal*100;
-    return `<div class="gb${pc>100?' over':''}"><div class="gl"><span>${x.n}</span><b class="num">${real>0&&pc<.5?'&lt;1':Math.round(pc)}%</b></div>
-      <div class="gt"><span style="width:${real>0?Math.min(100,Math.max(pc,1.5)):0}%"></span></div></div>`}).join('')}`;
+  $('#areasBtn').hidden=!tot;
+  if($('#sheetAreas').classList.contains('on'))renderAreas();
 }
+const CHEV='<svg class="chv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+// gastos por área: uma linha por área, da que leva mais pra que leva menos, com a barra na cor dela;
+// tocando, abrem embaixo os gastos que entram nela
+function renderAreas(){
+  const itens=fixosDoMes(Y0,M0), tot=sum(itens), abertas=new Set([...$('#areas').querySelectorAll('.area.open')].map(a=>a.dataset.k)), n=mesLongo(Y0,M0);
+  $('#aSub').innerHTML=`${n[0].toUpperCase()+n.slice(1)} · <b class="num">${fmtS(tot)}</b> no mês`;
+  const areas=CATS.map(c=>({c,its:itens.filter(x=>x.cat===c.k)})).filter(a=>a.its.length).map(a=>({...a,v:sum(a.its)})).sort((a,b)=>b.v-a.v);
+  $('#areas').innerHTML=areas.length?areas.map(({c,its,v})=>{const pc=v/tot*100, ab=abertas.has(c.k);
+    return `<div class="area${ab?' open':''}" data-k="${c.k}">
+      <button type="button" class="area-h press soft" aria-expanded="${ab}"><i style="background:${color(c.k)}">${svg(c.k)}</i>
+        <span class="t"><b>${c.n}</b><small>${its.length} ${its.length===1?'gasto':'gastos'} · ${pc<.5?'&lt;1':Math.round(pc)}%</small></span>
+        <b class="num">${fmtS(v)}</b>${CHEV}</button>
+      <span class="abar" aria-hidden="true"><span style="width:${Math.max(pc,1.5)}%;background:${color(c.k)}"></span></span>
+      <div class="collapse"><div><ul class="aitens">${its.slice().sort((a,b)=>b.valor-a.valor).map(x=>`<li><span class="t"><span>${esc(x.nome)}</span><small>${tipoNoMes(x,Y0,M0)}</small></span><b class="num">${fmtS(x.valor)}</b></li>`).join('')}</ul></div></div>
+    </div>`}).join(''):'<div class="empty">Nenhum gasto neste mês</div>'}
+$('#areasBtn').onclick=()=>{$('#areas').innerHTML='';renderAreas();open('#sheetAreas')};
+$('#areas').onclick=e=>{const b=e.target.closest('.area-h');if(!b)return;const a=b.closest('.area'), ab=!a.classList.contains('open');
+  a.classList.toggle('open',ab);b.setAttribute('aria-expanded',ab)};
 let verTodos=false;
 // o gasto mais novo aparece primeiro
 const ordem=arr=>arr.slice().reverse();
@@ -222,10 +246,10 @@ function renderList(arr){
     let r=box.querySelector(`[data-id="${x.id}"]`);
     if(!r){r=document.createElement('div');r.className='row';r.dataset.id=x.id}
     if(box.children[i]!==r)box.insertBefore(r,box.children[i]||null);
-    r.classList.toggle('off',!ativo(x,Y0,M0));
+    const agora=ativo(x,Y0,M0);r.classList.toggle('off',!agora);
     r.innerHTML=`<span class="dot ${x.cat}" style="background:${color(x.cat)}">${svg(x.cat)}</span>
       <span class="tx"><b></b><span>${subInfo(x)}</span></span>
-      <span class="val num">−${fmt(x.valor)}</span>`;
+      <span class="val num">−${fmt(agora?valorEm(x,Y0,M0):x.valor)}</span>`;
     r.querySelector('b').textContent=x.nome;
   });
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -269,6 +293,10 @@ function gastoValido(x,ids){
   if(positivo(x.taxa))g.taxa=positivo(x.taxa);
   if(ehId(x.meta))g.meta=x.meta;
   if(Number.isInteger(dia)&&dia>=1&&dia<=31){g.dia=dia;if(ehMes(x.pago))g.pago=x.pago}
+  // o valor de um mês só (ou 0, tirado daquele mês) é só do gasto de todo mês
+  if(!g.mes&&!g.parcelas&&x.valores&&typeof x.valores==='object'&&!Array.isArray(x.valores)){const r={};
+    Object.keys(x.valores).slice(0,400).forEach(k=>{const v=num(x.valores[k]);if(ehMes(k)&&v>=0&&isFinite(v))r[k]=Math.round(v*100)/100});
+    if(Object.keys(r).length)g.valores=r}
   return g}
 function metaValida(t){
   if(!t||typeof t!=='object'||!ehId(t.id)||!positivo(t.valor)||!positivo(t.mensal))return null;
@@ -298,7 +326,8 @@ function virar(s){const ks=Object.keys(s.salarios).sort(), u=ks[ks.length-1];if(
 function aparar(s,corte){if(!(s.comeco<corte))return;
   const c=ymParse(corte);if(!(corte in s.salarios))s.salarios[corte]=baseDe(c.y,c.m,s);
   [s.salarios,s.ajustes].forEach(o=>Object.keys(o).forEach(k=>{if(k<corte)delete o[k]}));
-  s.fixos=s.fixos.filter(f=>!acabou(f,idxMes(c.y,c.m)));s.comeco=corte}
+  s.fixos=s.fixos.filter(f=>!acabou(f,idxMes(c.y,c.m))).map(f=>{if(!f.valores)return f;const v=soChaves(f.valores,k=>k>=corte), g={...f};if(v)g.valores=v;else delete g.valores;return g});
+  s.comeco=corte}
 function load(d){const n=ler(d);if(!n)return false;S=n;
   migrou=!d.exemplo&&(Array.isArray(d.sims)&&d.sims.length>0||!d.salarios||n.aviso!==d.aviso||n.comeco!==d.comeco||Object.keys(n.salarios).length!==Object.keys(d.salarios).length);return true}
 try{load(JSON.parse(localStorage.getItem('meu-mes')||'null'))}catch(e){}
@@ -325,9 +354,10 @@ let gPag='unico', gN=3, gVM='total', gVence=0;
 const PAGS=['unico','mes','parc'];
 function setPag(p){gPag=p;const seg=$('#gPagSeg');seg.querySelector('.pill').style.transform=`translateX(${PAGS.indexOf(p)*100}%)`;
   seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pag===p));
-  $('#gParcOpts').hidden=p==='mes';$('#gVMF').hidden=$('#gStepF').hidden=$('#gVenceF').hidden=p!=='parc';$('#gJurosF').hidden=p!=='parc'||gVM!=='total';
+  // o de todo mês mostra de quando começa; editando um que já existe, ele continua começando quando já começava
+  $('#gParcOpts').hidden=p==='mes'&&!!editando&&editando.todo;$('#gVMF').hidden=$('#gStepF').hidden=$('#gVenceF').hidden=p!=='parc';$('#gJurosF').hidden=p!=='parc'||gVM!=='total';
   // o mês é o do dinheiro que paga: a conta que vence no mês que vem, paga com o salário deste, fica neste
-  $('#gMesLbl').textContent=p==='parc'?'Primeira parcela sai do dinheiro de':'Sai do dinheiro de';
+  $('#gMesLbl').textContent=p==='parc'?'Primeira parcela sai do dinheiro de':p==='mes'?'Começa no dinheiro de':'Sai do dinheiro de';
   $('label[for="gValor"]').textContent=p!=='parc'?'Valor':gVM==='parc'?'Valor de cada parcela':'Valor total';
   const vm=$('#gVMSeg');vm.classList.toggle('right',gVM==='parc');vm.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.vm===gVM));
   gParc();corpos.forEach(sombra)}
@@ -345,8 +375,12 @@ function itemDoForm(v){
   if(gPag==='parc')item={...item,valor:valorParcela(v),parcelas:gN,inicio:mesSel,...(gVence?{vence:1}:{})};
   else if(gPag==='unico')item.mes=mesSel;
   else{if(editando&&editando.taxa)item.taxa=editando.taxa;
-    // o de todo mês vale deste mês em diante; editando, continua valendo de quando já valia
-    const de=editando&&editando.todo?editando.desde:MES_ATUAL;if(de)item.desde=de}
+    // o de todo mês vale do mês escolhido em diante; editando, continua valendo de quando já valia
+    const de=editando&&editando.todo?editando.desde:mesSel;if(de)item.desde=de;
+    // a janela mostra o valor deste mês: sem mudar, o de todo mês continua o mesmo (e os meses com valor próprio também);
+    // mudando, ele vale pra todo mês e este mês deixa de ter um valor só dele
+    if(editando&&editando.todo){if(v===editando.mostra){item.valor=editando.base;if(editando.valores)item.valores={...editando.valores}}
+      else{const r=soChaves(editando.valores,k=>k!==MES_ATUAL);if(r)item.valores=r}}}
   if(editando&&editando.dia){item.dia=editando.dia;if(editando.pago)item.pago=editando.pago}
   // o mês em que foi lançado (editar não muda: continua sendo o mesmo gasto)
   const cr=editando?editando.criado:MES_ATUAL;if(cr)item.criado=cr;
@@ -370,18 +404,19 @@ function gParc(){
     <span class="pr-l"><span>Total <b>${fmt(tot)}</b></span><span class="pr-m">${mesCurto(i.y,i.m)}${SETA}<span class="so-leitor"> a </span>${mesCurto(f.getFullYear(),f.getMonth())}</span></span>
     ${juros>0.004?`<small>${fmt(juros)} de juros</small>`:''}`:'';
   depois()}
-// no lugar das simulações: enquanto digita, mostra quanto sobra no mês em que o gasto cai
+// no lugar das simulações: enquanto digita, mostra quanto sobra no mês em que o gasto cai (num mês que passou, quanto sobrou nele).
+// O de todo mês mostra este mês, ou o mês em que começa, se for depois
 function depois(){
   const v=parse($('#gValor').value), el=$('#gDepois');el.className='depois';
   if(!v||S.exemplo){el.textContent='';return}
-  const item=itemDoForm(v), i=ymParse(item.mes||item.inicio)||{y:Y0,m:M0};
-  const alvo=gPag==='mes'||idxMes(i.y,i.m)<idxMes(Y0,M0)?{y:Y0,m:M0}:i, sal=salarioDe(alvo.y,alvo.m);
+  const item=itemDoForm(v), i=ymParse(item.mes||item.inicio||item.desde)||{y:Y0,m:M0}, kH=idxMes(Y0,M0);
+  const alvo=idxMes(i.y,i.m)<kH&&gPag==='mes'?{y:Y0,m:M0}:i, ka=idxMes(alvo.y,alvo.m), sal=salarioDe(alvo.y,alvo.m);
   if(!sal){el.textContent='';return}
-  const outros=S.fixos.filter(f=>(!editando||f.id!==editando.id)&&ativo(f,alvo.y,alvo.m));
-  const sobra=sal-sum(outros)-(ativo(item,alvo.y,alvo.m)?item.valor:0);
-  const quando=idxMes(alvo.y,alvo.m)===idxMes(Y0,M0)?'neste mês':`em ${mesLongo(alvo.y,alvo.m)}`;
-  if(sobra<0){el.classList.add('neg');el.innerHTML=`Passa do salário em <b>${fmt(-sobra)}</b> ${quando}`}
-  else el.innerHTML=`Sobram <b>${fmt(sobra)}</b> ${quando}`}
+  const outros=fixosDoMes(alvo.y,alvo.m).filter(f=>!editando||f.id!==editando.id);
+  const sobra=sal-sum(outros)-(ativo(item,alvo.y,alvo.m)?valorEm(item,alvo.y,alvo.m):0), passou=ka<kH;
+  const quando=ka===kH?'neste mês':`em ${mesLongo(alvo.y,alvo.m)}`;
+  if(sobra<0){el.classList.add('neg');el.innerHTML=`${passou?'Passou':'Passa'} do salário em <b>${fmt(-sobra)}</b> ${quando}`}
+  else el.innerHTML=`${passou?'Sobrou':'Sobram'} <b>${fmt(sobra)}</b> ${quando}`}
 $('#gPagSeg').onclick=e=>{const b=e.target.closest('button');if(b)setPag(b.dataset.pag)};
 $('#gMenos').onclick=()=>{gN=Math.max(2,gN-1);gParc()};
 $('#gMais').onclick=()=>{gN=Math.min(120,gN+1);gParc()};
@@ -463,18 +498,34 @@ $('#gCats').onclick=e=>{const b=e.target.closest('button');if(b)setCat(b.dataset
 function proximo(){
   if(!parse($('#gValor').value)){$('#gValor').focus();toast('Coloque um valor');return}
   if(!catSel){pedirArea();toast('Escolha a área');return}
+  if(noMes){salvarNoMes();return}
   setPag(gPag);open('#sheetPag','#gGo')}
 $('#gProx').onclick=proximo;
-// abre a janela vazia ou preenchida pra editar
-function abrirGasto(id){const x=id?S.fixos.find(x=>x.id===id):null;
-  editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado}:null;
-  $('#gValor').value=x?String(x.valor).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);
+// abre a janela vazia ou preenchida pra editar. Vindo de um mês lá em Meses ('ctx', '2026-08'), o gasto novo já cai naquele mês,
+// e o de todo mês muda só naquele mês (noMes): a janela salva direto, sem a de como paga
+let noMes=false;
+function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymParse(ctx), nm=c?mesNome(c.y,c.m):'';
+  noMes=!!(x&&c&&todoMes(x));
+  // o valor que aparece é o daquele mês (o de todo mês pode ter um valor só daquele mês)
+  const mostra=!x?0:noMes?valorEm(x,c.y,c.m):todoMes(x)&&ativo(x,Y0,M0)?valorEm(x,Y0,M0):+x.valor;
+  editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado,ctx:c?ctx:null,base:+x.valor,mostra,valores:x.valores}:null;
+  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
-  $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):MES_ATUAL;
-  $('#gTitle').textContent=x?'Editar gasto':'Novo gasto';$('#gGo').textContent=x?'Salvar':'Adicionar';$('#gDel').hidden=!x;
+  $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):c?ctx:MES_ATUAL;
+  $('#gTitle').textContent=x?'Editar gasto':c&&ctx!==MES_ATUAL?`Novo gasto em ${nm}`:'Novo gasto';$('#gGo').textContent=x?'Salvar':'Adicionar';
+  $('#gProx').textContent=noMes?'Salvar':'Próximo';
+  const tirado=noMes&&fora(x,c.y,c.m);$('#gDel').hidden=!x||tirado;
+  $('#gDel').textContent=noMes?`Tirar de ${nm}`:c&&x&&x.parcelas&&x.inicio?'Apagar esta compra':'Apagar este gasto';
+  $('#gDica').hidden=!noMes;if(noMes)$('#gDica').textContent=tirado?`Ele foi tirado de ${nm}. Salve pra ele voltar nesse mês.`:`Muda só o valor de ${nm}. Nos outros meses continua ${fmtS(+x.valor)}.`;
   corpos.forEach(c=>c.scrollTop=0);
   setPag(gPag);open('#sheetGasto')}
+// em Meses, o de todo mês muda só naquele mês: o valor fica guardado só pra ele (igual ao de todo mês, volta a ser o de todo mês).
+// O nome e a área são do gasto, então mudam em todos os meses
+function salvarNoMes(){const ed=editando, v=parse($('#gValor').value), k=ed.ctx, c=ymParse(k), nome=$('#gNome').value.trim()||CAT[catSel].n, cat=catSel;
+  closeSheets();setTimeout(()=>change(()=>{const j=S.fixos.findIndex(x=>x.id===ed.id);if(j<0)return;
+    const f=S.fixos[j], vs={...(f.valores||{})}, g={...f,nome,cat};if(v===+f.valor)delete vs[k];else vs[k]=v;
+    if(Object.keys(vs).length)g.valores=vs;else delete g.valores;S.fixos[j]=g},`Gasto de ${mesNome(c.y,c.m)} atualizado`),250)}
 document.addEventListener('click',e=>{
   if(e.target.closest('[data-add]')){abrirGasto();return}
   const row=e.target.closest('#fixList .row');if(!row)return;
@@ -482,7 +533,7 @@ document.addEventListener('click',e=>{
   const x=S.fixos.find(f=>f.id===row.dataset.id);
   if(!(x&&x.meta&&abrirMeta(x.meta)))abrirGasto(row.dataset.id);
 });
-$('#gForm').onsubmit=e=>{e.preventDefault();const v=parse($('#gValor').value);
+$('#gForm').onsubmit=e=>{e.preventDefault();if(noMes){proximo();return}const v=parse($('#gValor').value);
   if(!v||!catSel){closeSheet($('#sheetPag'));proximo();return}
   const ed=editando, item=itemDoForm(v);
   let msg='Gasto de todo mês adicionado';
@@ -492,13 +543,20 @@ $('#gForm').onsubmit=e=>{e.preventDefault();const v=parse($('#gValor').value);
   // o de todo mês que já valia nos meses que passaram: o valor (ou o jeito de pagar) novo vale deste mês em diante
   // e esses meses continuam com o de antes
   const velho=ed&&S.fixos.find(x=>x.id===ed.id), parte=!!velho&&todoMes(velho)&&congelado(velho)&&(item.valor!==velho.valor||!todoMes(item));
-  if(parte){item.criado=MES_ATUAL;if(!item.mes)item.desde=MES_ATUAL;msg=`Gasto atualizado a partir de ${mesNome(Y0,M0)}`}
+  if(parte){item.criado=MES_ATUAL;if(!item.mes)item.desde=MES_ATUAL;
+    // os valores só de um mês que passou ficam com o de antes
+    const r=soChaves(item.valores,k=>k>=MES_ATUAL);if(r)item.valores=r;else delete item.valores;msg=`Gasto atualizado a partir de ${mesNome(Y0,M0)}`}
   closeSheets();setTimeout(()=>change(()=>{const i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;
     if(i<0)S.fixos.push(item);else S.fixos.splice(i,1,...(parte?[{...velho,id:uid(),ate:MES_ANTERIOR}]:[]),item)},msg),250)};
 // apagar fica dentro da janela de editar (menos risco de apagar sem querer) e pode ser desfeito.
-// O que já valia nos meses que passaram sai deste mês em diante: nesses meses ele continua
-$('#gDel').onclick=()=>{const ed=editando, i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;if(i<0)return;const item=S.fixos[i], fica=congelado(item);
-  closeSheets();setTimeout(()=>change(()=>{if(fica)S.fixos[i]={...item,ate:MES_ANTERIOR};else S.fixos.splice(i,1)},fica?`Gasto apagado a partir de ${mesNome(Y0,M0)}`:'Gasto apagado',
+// Na lista de Gastos, o que já valia nos meses que passaram sai deste mês em diante: nesses meses ele continua.
+// Em Meses é a pessoa corrigindo aquele mês: o de todo mês sai só dele, e o resto sai de vez (o parcelado, a compra inteira)
+$('#gDel').onclick=()=>{const ed=editando, i=ed?S.fixos.findIndex(x=>x.id===ed.id):-1;if(i<0)return;const item=S.fixos[i];
+  if(noMes){const k=ed.ctx, c=ymParse(k), achar=()=>S.fixos.findIndex(x=>x.id===item.id);
+    closeSheets();setTimeout(()=>change(()=>{const j=achar();if(j>=0)S.fixos[j]={...S.fixos[j],valores:{...(S.fixos[j].valores||{}),[k]:0}}},`Gasto tirado de ${mesNome(c.y,c.m)}`,
+      ()=>change(()=>{const j=achar();if(j>=0)S.fixos[j]=item},'Voltou')),250);return}
+  const fica=!ed.ctx&&congelado(item), compra=!!ed.ctx&&!!(item.parcelas&&item.inicio);
+  closeSheets();setTimeout(()=>change(()=>{if(fica)S.fixos[i]={...item,ate:MES_ANTERIOR};else S.fixos.splice(i,1)},fica?`Gasto apagado a partir de ${mesNome(Y0,M0)}`:compra?'Compra apagada':'Gasto apagado',
     ()=>change(()=>{if(fica)S.fixos[i]=item;else S.fixos.splice(i,0,item)},'Voltou')),250)};
 // a janela do salário serve pra este mês (os próximos seguem ele) e, lá em Meses, pra um mês que já passou
 let salMes=MES_ATUAL;
@@ -533,7 +591,7 @@ $('#mNext').onclick=()=>{mAno++;desenharMeses()};
 $('#mGrid').onclick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;$('#'+mesAlvo).value=ym(mAno,+b.dataset.m);desenharMeses();setTimeout(()=>{closeSheet($('#sheetMes'));gParc()},160)};
 
 /* ---------- meses: os que passaram e os próximos ---------- */
-let cPag=0, calSel={y:Y0,m:M0};
+let cPag=0, calSel={y:Y0,m:M0}, todoAberto=false;
 function mesInfo(y,m){const itens=fixosDoMes(y,m), sai=sum(itens), sal=salarioDe(y,m);return {itens,sai,sal,sobra:sal-sai}}
 /* ---------- metas salvas (até 3) ---------- */
 const br=v=>String(v).replace('.',',');
@@ -665,6 +723,7 @@ const metasNoMes=(y,m)=>(S.metas||[]).filter(t=>{const i=metaInfo(t);return i.ok
 // do primeiro mês do histórico, e assim continua com 6 meses (a mais antiga pode repetir alguns da seguinte)
 function paginaCal(){const kHoje=idxMes(Y0,M0), c=ymParse(S.comeco), primeiro=Math.min(c?idxMes(c.y,c.m):kHoje,kHoje), ini=Math.max(kHoje+cPag*6,primeiro);
   return {ini,z:ini+5,antes:ini>primeiro}}
+const MAIS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const LAPIS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>';
 function renderCal(){
   // quanto sai em cada mês e o que acaba nele
@@ -688,13 +747,14 @@ function renderCal(){
   // em todo mês, também no atual, aparece um por um o que é só daquele mês
   // (parcela, meta, gasto de um mês só) e o que é de todo mês vira uma linha
   // aqui tudo é o que sai: o valor vai sem o sinal de menos e sem o ,00
-  const linha=(ic,cor,nome,sub,v,lista)=>`<div><i style="background:${cor}">${ic}</i><span class="t"><span>${nome}</span><small${lista?' class="lista"':''}>${sub}</small></span><b>${fmtS(v)}</b></div>`;
-  const todo=inf.itens.filter(todoMes);
-  const linhas=[...inf.itens.filter(x=>!todoMes(x)).map(x=>{let sub='Só neste mês';
-      if(x.meta)sub='Meta';
-      else if(x.parcelas){const i=ymParse(x.inicio),n=idxMes(y,m)-idxMes(i.y,i.m)+1;sub=n===x.parcelas?'Última parcela':`Parcela ${n} de ${esc(x.parcelas)}`}
-      return linha(svg(x.cat),color(x.cat),esc(x.nome),sub,x.valor)}),
-    ...(todo.length?[linha(svg('assinaturas'),'var(--c-outros)','Todo mês',esc(todo.map(x=>x.nome).join(', ')),sum(todo),1)]:[])].join('')||'<p>Nenhum gasto neste mês.</p>';
+  // cada linha abre o gasto pra mudar ou tirar naquele mês; a do Todo mês abre embaixo um por um
+  // (com os que foram tirados daquele mês, apagados, pra poder voltar)
+  const linha=(ic,cor,nome,sub,v,o)=>`<button type="button" class="ln press soft${o.cls||''}" ${o.attr}><i style="background:${cor}">${ic}</i><span class="t"><span>${nome}</span><small${o.lista?' class="lista"':''}>${sub}</small></span><b>${fmtS(v)}</b>${o.fim||''}</button>`;
+  const gasto=(x,sub,cls)=>linha(svg(x.cat),color(x.cat),esc(x.nome),sub,x.valor,{attr:`data-gasto="${esc(x.id)}"`,cls});
+  const kM=ym(y,m), todo=inf.itens.filter(todoMes), tirados=S.fixos.filter(f=>todoMes(f)&&fora(f,y,m)&&noPeriodo(f,y,m));
+  const linhas=[...inf.itens.filter(x=>!todoMes(x)).map(x=>gasto(x,tipoNoMes(x,y,m))),
+    ...(todo.length||tirados.length?[linha(svg('assinaturas'),'var(--c-outros)','Todo mês',esc(todo.map(x=>x.nome).join(', '))||'Nenhum neste mês',sum(todo),{lista:1,attr:`data-todo aria-expanded="${todoAberto}"`,fim:CHEV}),
+      ...(todoAberto?[`<div class="todo-l">${[...todo.map(x=>gasto(x,x.valores&&kM in x.valores?'Valor só deste mês':CAT[x.cat].n)),...tirados.map(x=>gasto(x,'Tirado deste mês',' off'))].join('')}</div>`]:[])]:[])].join('')||'<p>Nenhum gasto neste mês.</p>';
   // o resumo do mês numa linha só: quanto sai e quanto sobra (ou falta), e a barra embaixo; num mês que passou, saiu e sobrou
   const sal=inf.sal, neg=sal>0&&inf.sobra<0, topoM=Math.max(sal,inf.sai,1);
   // todo mês mostra o salário com o lápis, pra mudar só aquele mês (o deste mês vale também pros próximos)
@@ -705,7 +765,8 @@ function renderCal(){
     <div class="dres${neg?' neg':''}"><span>${passou?'Saiu':'Sai'} <b>${fmt0(inf.sai)}</b></span><span class="sb">${neg?passou?'Faltou':'Falta':passou?'Sobrou':'Sobra'} <b>${sal?fmt0(Math.abs(inf.sobra)):'—'}</b></span></div>
     <div class="split-bar" aria-hidden="true"><span class="d-gasto" style="width:${Math.min(inf.sai,sal||inf.sai)/topoM*100}%"></span>${neg?`<span class="d-falta" style="width:${(inf.sai-sal)/topoM*100}%"></span>`:`<span class="d-sobra" style="width:${Math.max(0,inf.sobra)/topoM*100}%"></span>`}</div>
     <div class="mini">${linhas}</div>
-    ${metasNoMes(y,m).map(t=>`<p><b>Bate a meta “${esc(t.nome)}”</b></p>`).join('')}`;
+    ${metasNoMes(y,m).map(t=>`<p><b>Bate a meta “${esc(t.nome)}”</b></p>`).join('')}
+    <button type="button" class="add-mes press soft" data-add-mes>${MAIS}Adicionar gasto em ${mesNome(y,m)}</button>`;
   caberDres();
 }
 $('#cGrid').onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=+b.dataset.k;calSel={y:Math.floor(k/12),m:k%12};renderCal()};
@@ -715,7 +776,13 @@ function pagina(d){cPag+=d;const {ini,z}=paginaCal(), kHoje=idxMes(Y0,M0), n=cPa
   calSel={y:Math.floor(n/12),m:n%12};renderCal()}
 $('#cPrev').onclick=()=>pagina(-1);
 $('#cNext').onclick=()=>pagina(1);
-$('#cDet').onclick=e=>{const b=e.target.closest('[data-sal]');if(b)openSal(b.dataset.sal)};
+// no mês aberto: o salário, a lista do Todo mês, um gasto pra mudar ou tirar e o gasto novo, que já cai naquele mês
+$('#cDet').onclick=e=>{const t=e.target, k=ym(calSel.y,calSel.m), s=t.closest('[data-sal]');if(s){openSal(s.dataset.sal);return}
+  if(t.closest('[data-todo]')){todoAberto=!todoAberto;renderCal();$('#cDet [data-todo]').focus({preventScroll:true});return}
+  if(t.closest('[data-add-mes]')){abrirGasto(null,k);return}
+  const g=t.closest('[data-gasto]'), x=g&&S.fixos.find(f=>f.id===g.dataset.gasto);if(!x)return;
+  // o Guardar de uma meta se muda pela própria meta
+  if(!(x.meta&&abrirMeta(x.meta)))abrirGasto(x.id,k)};
 const renderBase=render; render=function(){renderBase();renderCal()};
 renderCal();
 })();

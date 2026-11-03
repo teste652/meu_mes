@@ -227,9 +227,18 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .d-gasto{background:color-mix(in srgb,var(--ink) 55%,transparent)}
 .d-sobra{background:var(--hero)}
 .d-falta{background:var(--bad)}
-/* os gastos do mês: um embaixo do outro, com folga, separados do resumo por uma linha */
+/* os gastos do mês: um embaixo do outro, com folga, separados do resumo por uma linha. Cada um é um botão que abre o gasto */
 .mini{display:flex;flex-direction:column;gap:18px;margin-top:4px;padding-top:16px;border-top:1px solid var(--line)}
-.mini div{display:flex;align-items:center;gap:12px;font-size:.92rem;min-width:0}
+.mini .ln{display:flex;align-items:center;gap:12px;font-size:.92rem;min-width:0;width:calc(100% + 16px);margin:-6px -8px;padding:6px 8px;border-radius:14px;text-align:left}
+@media (hover:hover){.mini .ln:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}}
+.mini .ln.off{opacity:.5}
+.mini .ln .chv{width:16px;height:16px;margin-left:-4px}
+/* os de todo mês, abertos um por um embaixo da linha deles */
+.todo-l{display:flex;flex-direction:column;gap:18px;margin:-4px 0 0 15px;padding:4px 0 0 15px;border-left:2px solid var(--line)}
+/* gasto novo naquele mês */
+.add-mes{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:6px;padding:13px;border-radius:var(--r-md);background:var(--surface);font-weight:700;font-size:.9rem;color:var(--ink)}
+.add-mes svg{width:17px;height:17px;flex:none}
+@media (max-width:340px){.add-mes svg{display:none}}
 .mini i{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:#fff;flex:none}
 .mini i svg{width:15px;height:15px}
 .mini .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;overflow-wrap:break-word}
@@ -297,15 +306,29 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 /* tela estreita: a rosca diminui pra legenda caber inteira e, mais estreita ainda, a legenda vai pra baixo */
 @media (max-width:380px){.onde{grid-template-columns:116px 1fr;gap:14px}.donut{width:116px;height:116px}.donut .c b{font-size:.95rem}}
 @media (max-width:340px){.onde{grid-template-columns:1fr;justify-items:center}.leg-onde{width:100%}}
-/* embaixo da rosca: uma barra por grupo; a barra inteira é o salário e enche até a porcentagem que o grupo leva */
-.grupos{display:flex;flex-direction:column;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
-.grupos .lbl{color:var(--muted);opacity:1}
-.gb .gl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.9rem;font-weight:700}
-.gb .gl b{font-size:1.05rem;font-weight:800;white-space:nowrap}
-.gb .gt{height:8px;border-radius:var(--r-pill);background:var(--line);margin-top:6px;overflow:hidden}
-.gb .gt span{display:block;height:100%;border-radius:inherit;background:var(--ink);opacity:.7;transition:width .6s cubic-bezier(.22,1,.36,1)}
-.gb.over .gl b{color:var(--bad)}
-.gb.over .gt span{background:var(--bad);opacity:1}
+/* embaixo da rosca, o botão que abre os gastos de cada área */
+#areasBtn{margin-top:18px}
+/* gastos por área: uma linha por área com a barra na cor dela; tocando, abrem embaixo os gastos que entram nela */
+.a-sub{margin:-6px 0 0;color:var(--muted);font-size:.9rem;font-weight:600}
+.a-sub b{color:var(--ink);font-weight:800}
+.areas{display:flex;flex-direction:column;gap:8px}
+.area{background:var(--surface-2);border-radius:var(--r-lg);padding:12px 14px 12px 12px}
+.area-h{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.area-h i{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none}
+.area-h i svg{width:17px;height:17px}
+.area-h .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.area-h .t b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.area-h .t small{font-size:.78rem;color:var(--muted);font-weight:600}
+.area-h>.num{font-weight:800;white-space:nowrap}
+.chv{width:18px;height:18px;color:var(--muted);flex:none;transition:transform .45s var(--spring)}
+.area.open .chv,[aria-expanded="true"]>.chv{transform:rotate(180deg)}
+.abar{display:block;height:6px;border-radius:var(--r-pill);background:var(--line);overflow:hidden;margin:10px 0 0 46px}
+.abar span{display:block;height:100%;border-radius:inherit;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.aitens{list-style:none;margin:0;padding:14px 0 2px 46px;display:flex;flex-direction:column;gap:12px}
+.aitens li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.9rem;min-width:0}
+.aitens .t{display:flex;flex-direction:column;min-width:0;line-height:1.25;overflow-wrap:break-word}
+.aitens small{font-size:.78rem;color:var(--muted);font-weight:600}
+.aitens b{white-space:nowrap;font-weight:700}
 
 /* próximos meses: um cartão por mês com quanto sai; um pontinho no canto marca o mês em que acaba parcela ou bate meta */
 .cmeses{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
@@ -329,6 +352,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .cmeses button.sel .cmt span.over{background:var(--hero-neg)}
 
 /* janela de gasto */
+/* o de todo mês aberto em Meses: o que muda é só aquele mês */
+.dica{margin:0;color:var(--muted);font-size:.9rem;text-align:center;line-height:1.4}
 /* o quanto sobra: maior e com folga do botão */
 .depois{margin:4px 0 14px;font-size:1.05rem;color:var(--muted);text-align:center;min-height:1.3em}
 .depois:empty{display:none}
@@ -467,7 +492,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     <button class="ver-todos press soft" type="button" id="fixMais" hidden></button>
   </section>
 
-  <!-- para onde vai o dinheiro: rosca por área + quanto do salário vai pra cada grupo -->
+  <!-- para onde vai o dinheiro: rosca por área + o botão que abre os gastos de cada área -->
   <section class="card">
     <div class="sec-head">
       <div class="grow">
@@ -475,7 +500,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
       </div>
     </div>
     <div class="onde" id="onde"></div>
-    <div class="grupos" id="grupos"></div>
+    <button class="ver-todos press soft" type="button" id="areasBtn" hidden>Ver gastos por área</button>
   </section>
 
   <section class="card">
@@ -540,6 +565,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
       </div>
     </div>
     <div class="pe">
+      <p class="dica" id="gDica" hidden></p>
       <button class="go press" type="button" id="gProx">Próximo</button>
       <button class="apagar press" type="button" id="gDel" hidden>Apagar este gasto</button>
     </div>
@@ -632,6 +658,16 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     <button class="go press" type="submit" id="tGo">Criar meta</button>
     <button class="apagar press" type="button" id="tDel" hidden>Apagar esta meta</button>
   </form>
+</div>
+
+<!-- gastos por área: tudo o que saiu no mês, área por área -->
+<div class="sheet" id="sheetAreas" role="dialog" aria-modal="true" aria-labelledby="aTitle">
+  <div class="in">
+    <div class="grab"></div>
+    <div class="sheet-top"><button type="button" class="back press" data-back aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg><span>Voltar</span></button><h3 id="aTitle">Gastos por área</h3></div>
+    <p class="a-sub" id="aSub"></p>
+    <div class="areas" id="areas"></div>
+  </div>
 </div>
 
 <div class="sheet" id="sheetSal" role="dialog" aria-modal="true" aria-labelledby="sTitle">

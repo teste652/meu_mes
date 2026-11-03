@@ -48,7 +48,7 @@
       "sizes": "780x1688",
       "type": "image/webp",
       "form_factor": "narrow",
-      "label": "Para onde vai o dinheiro, por área e na divisão 50/30/20"
+      "label": "Para onde vai o dinheiro e quanto saiu em cada área"
     },
     {
       "src": "screenshots/proximos-meses.webp",
