@@ -346,9 +346,9 @@ document.addEventListener('pointerdown',e=>{const b=e.target.closest('.press');i
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pilha.length)closeSheet(pilha[pilha.length-1])});
 
 /* ---------- sheets ---------- */
-// o Próximo vai uma parte por vez: valor, O que é, área e, só então, Como você paga.
-// nomeVisto: a pessoa já passou pelo O que é; areaVista: já passou pela área (tocou numa, ou o Próximo já mostrou a sugerida)
-let catSel=null, catAuto=false, nomeVisto=false, areaVista=false, editando=null;
+// o Próximo vai uma parte por vez: valor, O que é, área e, só então, Como você paga (no gasto novo e no que já existe).
+// passo: em que parte a pessoa está (0 valor, 1 O que é, 2 área); o Próximo leva pra seguinte
+let catSel=null, catAuto=false, passo=0, editando=null;
 $('#gCats').innerHTML=CATS.map(c=>`<button type="button" class="press" data-cat="${c.k}" aria-pressed="false" style="--cc:${color(c.k)}"><i style="background:${color(c.k)}">${svg(c.k)}</i>${c.n}</button>`).join('');
 // gasto: só um mês, todo mês (água, luz) ou parcelado (o valor é o total e vira parcelas nos meses certos)
 // no parcelado, a primeira parcela pode vencer no mês seguinte ao do dinheiro que paga (gVence=1, salvo como vence:1)
@@ -367,16 +367,31 @@ function setPag(p){gPag=p;const seg=$('#gPagSeg');seg.querySelector('.pill').sty
 const corpos=[...document.querySelectorAll('#gForm .corpo')];
 const sombra=c=>c.classList.toggle('mais',c.scrollTop+c.clientHeight<c.scrollHeight-4);
 corpos.forEach(c=>c.addEventListener('scroll',()=>sombra(c),{passive:true}));
-// o Próximo leva até cada parte rolando devagar só o meio da janela (nunca a janela inteira), com a parte logo abaixo do título
-const devagar=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
-function rolarAte(el){const c=el&&el.closest('.corpo');if(!c)return;
-  const topo=c.scrollTop+el.getBoundingClientRect().top-c.getBoundingClientRect().top-6;
-  c.scrollTo({top:Math.max(0,Math.min(topo,c.scrollHeight-c.clientHeight)),behavior:devagar()})}
-// o teclado abrindo ou fechando muda o tamanho do meio: logo depois de um Próximo, a rolagem acompanha até a parte certa
-let alvoRolar=null, alvoAte=0;
-function seguirAte(el){alvoRolar=el;alvoAte=performance.now()+800;rolarAte(el)}
-if(window.ResizeObserver){const ro=new ResizeObserver(es=>{es.forEach(e=>sombra(e.target.closest('.corpo')));if(alvoRolar&&performance.now()<alvoAte)rolarAte(alvoRolar)});
+if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>sombra(e.target.closest('.corpo'))));
   corpos.forEach(c=>[c,...c.children].forEach(k=>ro.observe(k)))}
+// o Próximo leva até cada parte rolando devagar só o meio da janela (nunca a janela inteira), com a parte logo abaixo do título.
+// A rolagem é do próprio app, quadro a quadro: enquanto a janela sobe ou desce com o teclado, ela vai junto até a parte certa,
+// sem recomeçar a cada quadro (a rolagem do navegador recomeça e engasga). Um toque da pessoa no meio para tudo
+const calmo=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+let rolando=null;
+function parar(){if(rolando){cancelAnimationFrame(rolando.q);rolando=null}}
+function rolar(c,alvo){parar();if(!c)return;
+  const ini=c.scrollTop,t0=performance.now(),dur=calmo()?0:420,r={};rolando=r;
+  const quadro=agora=>{if(rolando!==r)return;
+    const max=c.scrollHeight-c.clientHeight,y=Math.max(0,Math.min(alvo(ini),max)),p=dur?Math.min(1,(agora-t0)/dur):1;
+    c.scrollTop=ini+(y-ini)*(1-Math.pow(1-p,3));
+    // depois de chegar, segue mais um pouco: a janela ainda pode estar mudando de tamanho com o teclado
+    if(agora-t0<1100)r.q=requestAnimationFrame(quadro);else rolando=null};
+  r.q=requestAnimationFrame(quadro)}
+const caixa=el=>el&&(el.closest('.sheet.on .corpo')||el.closest('.sheet.on .in:not(.fixo)'));
+const dentro=(el,c)=>c.scrollTop+el.getBoundingClientRect().top-c.getBoundingClientRect().top;
+// a parte logo abaixo do título
+function seguirAte(el){const c=caixa(el);if(c)rolar(c,()=>dentro(el,c)-6)}
+// só o necessário pro campo tocado ficar à vista (acima do teclado e do botão)
+function mostrarCampo(el){const c=caixa(el);if(!c)return;
+  rolar(c,ini=>{const y=dentro(el,c),h=el.getBoundingClientRect().height,v=c.clientHeight;
+    return y-12<ini?y-12:y+h+12>ini+v?y+h+12-v:ini})}
+['touchstart','wheel'].forEach(ev=>document.addEventListener(ev,e=>{if(rolando&&e.target.closest&&e.target.closest('.corpo,.sheet .in'))parar()},{passive:true}));
 // com juros, a parcela segue a tabela price (a mesma conta das lojas e dos bancos)
 const gTaxa=()=>gPag==='parc'&&gVM==='total'?taxa($('#gJuros').value):0;
 const valorParcela=v=>{const j=gTaxa();return gVM==='parc'?v:Math.round((j?v*j/(1-Math.pow(1+j,-gN)):v/gN)*100)/100};
@@ -440,27 +455,29 @@ function repetir(b){let t,i;const parar=()=>{clearTimeout(t);clearInterval(i)};
 ['#gMenos','#gMais'].forEach(id=>repetir($(id)));
 $('#gValor').addEventListener('input',gParc);
 $('#gJuros').addEventListener('input',gParc);
-function setCat(k,auto){const antes=catSel;catSel=k;catAuto=!!(k&&auto);if(k&&!auto)areaVista=true;else if(auto&&k!==antes)areaVista=false;$('#gCats').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===k));
+function setCat(k,auto){catSel=k;catAuto=!!(k&&auto);$('#gCats').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.cat===k));
   const l=$('#gAreaLbl');if(k)l.classList.remove('pick');
   if(!l.classList.contains('pick'))l.textContent=catAuto?'Área sugerida':'Área'}
 // enquanto a pessoa não toca numa área, ela acompanha o que vai sendo escrito
 $('#gNome').addEventListener('input',e=>{if(catSel&&!catAuto)return;const k=areaPeloNome(e.target.value);if(k||catAuto)setCat(k,true)});
 // no celular o Próximo fecha o teclado e desce até as áreas; no computador o foco vai pra elas (tracejado, que não parece área escolhida)
 const toque=()=>matchMedia('(pointer:coarse)').matches;
-function verAreas(el){if(toque())document.activeElement?.blur();else el.focus({preventScroll:true});seguirAte($('#gAreaLbl').closest('.field'))}
-function irValor(){$('#gValor').focus({preventScroll:true});seguirAte($('#gValor').closest('.field'))}
-function irNome(){nomeVisto=true;$('#gNome').focus({preventScroll:true});seguirAte($('#gNome').closest('.field'))}
-$('#gNome').addEventListener('focus',()=>{nomeVisto=true});
+function verAreas(el){passo=2;if(toque())document.activeElement?.blur();else el.focus({preventScroll:true});seguirAte($('#gAreaLbl').closest('.field'))}
+function irValor(){passo=0;$('#gValor').focus({preventScroll:true});seguirAte($('#gValor').closest('.field'))}
+function irNome(){passo=1;$('#gNome').focus({preventScroll:true});seguirAte($('#gNome').closest('.field'))}
+// tocar direto numa parte também conta como estar nela
+$('#gValor').addEventListener('focus',()=>{passo=0});
+$('#gNome').addEventListener('focus',()=>{passo=1});
+$('#gCats').addEventListener('focusin',()=>{passo=2});
 function pedirArea(){const l=$('#gAreaLbl');l.classList.add('pick');l.textContent='Escolha a área';verAreas($('#gCats').querySelector('button'))}
-// a área que o app achou pelo nome fica marcada, mas quem confirma é a pessoa: o primeiro Próximo só mostra, o segundo segue
+// a área que o app achou pelo nome fica marcada, mas quem confirma é a pessoa: o Próximo no O que é só mostra, o seguinte segue
 function mostrarArea(){const b=$('#gCats [aria-pressed="true"]');if(!b)return pedirArea();
-  areaVista=true;b.classList.remove('realce');void b.offsetWidth;b.classList.add('realce');verAreas(b)}
+  b.classList.remove('realce');void b.offsetWidth;b.classList.add('realce');verAreas(b)}
 // Enter: valor -> o que é -> área (a pessoa confere a sugerida), igual ao botão Próximo -> como paga; na segunda janela, o Enter adiciona
 $('#gForm').addEventListener('keydown',e=>{
   if(e.key!=='Enter'||e.isComposing)return;
   const t=e.target;
-  if(t.id==='gValor'){e.preventDefault();if(!parse(t.value)){toast('Coloque um valor');return}irNome();return}
-  if(t.id==='gNome'){e.preventDefault();proximo();return}
+  if(t.id==='gValor'||t.id==='gNome'){e.preventDefault();proximo();return}
   const chip=t.closest&&t.closest('#gCats button');
   if(chip){e.preventDefault();setCat(chip.dataset.cat);proximo()}
 });
@@ -472,25 +489,59 @@ $('#gCats').addEventListener('keydown',e=>{
 const pilha=[];
 function arrumarPilha(){pilha.forEach((el,i)=>{const atras=i<pilha.length-1;el.style.zIndex=21+i;el.classList.toggle('atras',atras);el.inert=atras});
   $('#scrim').classList.toggle('on',pilha.length>0)}
+// campo que abre o teclado do celular
+const campo=el=>!!el&&!!el.matches&&el.matches('input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=file]),textarea')&&!el.readOnly&&!el.disabled;
 function open(id,foco){const el=$(id);if(!pilha.includes(el))pilha.push(el);el.classList.add('on');arrumarPilha();historico();
-  setTimeout(()=>(foco?$(foco):el.querySelector('input:not([type="hidden"])'))?.focus({preventScroll:true}),350)}
+  const alvo=foco?$(foco):el.querySelector('input:not([type="hidden"])');
+  // com o tamanho do teclado já conhecido, a janela sobe direto até onde ele vai ficar e o teclado sobe junto: um movimento só
+  const junto=campo(alvo)&&prever(alvo);
+  setTimeout(()=>alvo?.focus({preventScroll:true}),junto?120:350)}
 function fechar(el){const i=pilha.indexOf(el);if(i>=0)pilha.splice(i,1);el.classList.remove('on','atras');el.inert=false}
 function closeSheet(el){fechar(el);arrumarPilha();document.activeElement?.blur();historico()}
 function closeSheets(){[...pilha].forEach(fechar);arrumarPilha();document.activeElement?.blur();historico()}
-// o teclado do celular cobre a parte de baixo da tela: a janela aberta sobe junto e fica inteira à vista em cima dele.
-// No Android o navegador já encolhe a tela (interactive-widget, lá no HTML) e aqui a conta dá zero; no iPhone é esta conta que sobe a janela
-const vv=window.visualViewport;let tecAntes='';
-function teclado(){if(!vv||vv.scale>1.01)return;
-  let baixo=Math.round(innerHeight-vv.height-vv.offsetTop);if(baixo<40)baixo=0;
-  // só mexe na página quando algo mudou (o evento também chega com a página parada)
-  const vis=Math.round(vv.height),k=baixo+'/'+vis;if(k===tecAntes)return;tecAntes=k;
-  const raiz=document.documentElement;raiz.style.setProperty('--teclado',baixo+'px');raiz.style.setProperty('--visivel',vis+'px');raiz.classList.toggle('teclado',baixo>0);
-  // depois que a janela sobe (e encolhe, se for alta), o campo em que está digitando continua à vista dentro dela
-  // (na janela do gasto quem rola é o meio; a janela inteira nunca rola, senão o título e o botão pulam)
-  const a=document.activeElement,box=a&&a.matches('input')&&(a.closest('.sheet.on .corpo')||a.closest('.sheet.on .in:not(.fixo)'));
-  if(box)setTimeout(()=>{const r=a.getBoundingClientRect(),q=box.getBoundingClientRect();
-    const d=r.bottom>q.bottom-12?r.bottom-q.bottom+12:r.top<q.top+12?r.top-q.top-12:0;if(d)box.scrollBy({top:d,behavior:devagar()})},300)}
-if(vv){vv.addEventListener('resize',teclado);vv.addEventListener('scroll',teclado);teclado()}
+// O teclado do celular. A janela aberta fica com a borda de baixo bem onde o teclado começa (--base, contada do alto da tela)
+// e nunca mais alta que o que sobra de tela (--visivel). No iPhone o teclado cobre a página; no Android a página encolhe.
+// Contada do alto, a janela fica parada nos dois quando a página muda de tamanho, e só se mexe quando o app manda, devagar.
+// O celular só conta o tamanho do teclado quando ele já subiu (ou quase): por isso o app guarda o tamanho de cada teclado
+// (o de números é mais baixo) e move a janela já no toque, junto com o teclado. Quando o celular conta, só ajusta se precisar
+const vv=window.visualViewport, raiz=document.documentElement;
+let tec={};try{tec=JSON.parse(localStorage.getItem('meu-mes-teclado'))||{}}catch(e){}
+let livre=innerHeight, largura=innerWidth, aplicado={base:-1,vis:-1}, previsto=null, espera=0;
+const chaveTec=el=>(/^(decimal|numeric)$/.test(el.inputMode)||el.type==='number'?'num':'txt')+(innerWidth>innerHeight?'-deitado':'');
+const guardarTec=()=>{try{localStorage.setItem('meu-mes-teclado',JSON.stringify(tec))}catch(e){}};
+function por(base,vis,seco){const s=raiz.style;aplicado={base,vis};
+  if(seco)s.setProperty('--tt','0s');
+  s.setProperty('--base',base+'px');s.setProperty('--visivel',vis+'px');s.setProperty('--alto',livre+'px');
+  s.setProperty('--teclado',Math.max(0,innerHeight-base)+'px');raiz.classList.toggle('teclado',livre-base>120);
+  if(seco){document.querySelectorAll('.sheet.on .in').forEach(i=>getComputedStyle(i).maxHeight);s.removeProperty('--tt')}}
+function medir(forcar){if(!vv||vv.scale>1.01)return;
+  if(innerWidth!==largura){largura=innerWidth;livre=0}
+  // (a parte visível nunca passa da página: um número estranho do celular, logo ao abrir, não estraga a conta)
+  const base=Math.min(innerHeight,Math.round(vv.offsetTop+vv.height)), vis=Math.min(base,Math.round(vv.height)), a=document.activeElement, aberto=toque()&&livre-base>120;
+  if(!aberto)livre=base;
+  else if(campo(a)){const t=chaveTec(a),k=Math.round(livre-base);if(tec[t]!==k){tec[t]=k;guardarTec()}}
+  // enquanto o teclado ainda sobe (ou desce), o que o celular conta pode ser o de antes: a janela espera ele chegar
+  if(previsto&&!forcar){if(aberto!==previsto.aberto&&performance.now()<previsto.ate)return;previsto=null;clearTimeout(espera)}
+  // a página só rolou por baixo do teclado (o tamanho é o mesmo): a janela vai junto na hora, senão descola do teclado
+  const mudou=aplicado.vis!==vis;por(base,vis,!mudou&&aplicado.base!==base);
+  // o teclado mudou de tamanho sem trocar de campo (outro idioma, emojis): o campo continua à vista
+  if(mudou&&aberto&&campo(a)&&!rolando)mostrarCampo(a)}
+// um campo vai ganhar o foco (o teclado vai subir, ou trocar de tipo) ou perder (vai descer): a janela já vai pro lugar
+function prever(el){if(!vv||!toque())return false;
+  let k=0;
+  // na primeira vez, num celular em pé, um tamanho de teclado comum; depois, o que ele mediu
+  if(el){const t=chaveTec(el);k=tec[t]!=null?tec[t]:innerWidth<600&&innerHeight>innerWidth?Math.round(livre*(t==='num'?.4:.46)):0;if(k<=120)return false}
+  else if(livre-aplicado.base<=120)return false;
+  const base=livre-k;previsto={aberto:k>0,ate:performance.now()+1500};
+  clearTimeout(espera);espera=setTimeout(()=>{const a=document.activeElement;
+    // o teclado não apareceu (um teclado de verdade ligado no celular, por exemplo): da próxima vez a janela não sobe sozinha
+    if(k&&campo(a)&&livre-(vv.offsetTop+vv.height)<=120){tec[chaveTec(a)]=0;guardarTec()}
+    previsto=null;medir(true)},1500);
+  if(Math.abs(base-aplicado.base)>=1)por(base,base,false);
+  return k>0}
+document.addEventListener('focusin',e=>{const a=e.target;if(!campo(a)||!a.closest('.sheet.on'))return;prever(a);if(toque())mostrarCampo(a)});
+document.addEventListener('focusout',e=>{if(campo(e.target)&&!campo(e.relatedTarget))prever(null)});
+if(vv){vv.addEventListener('resize',()=>medir());vv.addEventListener('scroll',()=>medir());medir()}
 // o voltar do celular fecha a janela de cima, e só com todas fechadas sai do app:
 // cada janela aberta ganha uma entrada no histórico, que guarda quantas estavam abertas
 let voltando=0;
@@ -507,18 +558,20 @@ if(noHistorico())try{history.replaceState(null,'')}catch(e){}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-back]');if(b)closeSheet(b.closest('.sheet'))});
 // tocar fora volta uma janela (não perde o que já foi preenchido na de baixo)
 $('#scrim').onclick=()=>{if(pilha.length)closeSheet(pilha[pilha.length-1])};
-$('#gCats').onclick=e=>{const b=e.target.closest('button');if(b)setCat(b.dataset.cat)};
+$('#gCats').onclick=e=>{const b=e.target.closest('button');if(b){setCat(b.dataset.cat);passo=2}};
 
-// Próximo (o botão e o do teclado): leva até a próxima parte que falta (O que é, depois a área, a sugerida ou a escolher);
-// com tudo visto, abre por cima a janela de como paga
-function proximo(){
+// Próximo (o botão e o do teclado): do valor vai pro O que é, do O que é vai pra área (a sugerida, ou a escolher)
+// e, da área, abre por cima a janela de como paga. Lá em Meses (noMes) o botão vira Salvar e salva direto (salvar=true)
+function proximo(salvar){
   if(!parse($('#gValor').value)){irValor();toast('Coloque um valor');return}
-  if(!nomeVisto){irNome();return}
+  if(!salvar&&passo===0){irNome();return}
+  if(!salvar&&passo===1){mostrarArea();return}
   if(!catSel){pedirArea();toast('Escolha a área');return}
-  if(!areaVista){mostrarArea();return}
   if(noMes){salvarNoMes();return}
   setPag(gPag);open('#sheetPag','#gGo')}
-$('#gProx').onclick=proximo;
+$('#gProx').onclick=()=>proximo(noMes);
+// tocar no Próximo não tira o foco do campo: entre o valor e o O que é o teclado só troca, sem descer e subir de novo
+$('#gProx').addEventListener('mousedown',e=>e.preventDefault());
 // abre a janela vazia ou preenchida pra editar. Vindo de um mês lá em Meses ('ctx', '2026-08'), o gasto novo já cai naquele mês,
 // e o de todo mês muda só naquele mês (noMes): a janela salva direto, sem a de como paga
 let noMes=false;
@@ -527,7 +580,7 @@ function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymPars
   // o valor que aparece é o daquele mês (o de todo mês pode ter um valor só daquele mês)
   const mostra=!x?0:noMes?valorEm(x,c.y,c.m):todoMes(x)&&ativo(x,Y0,M0)?valorEm(x,Y0,M0):+x.valor;
   editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado,ctx:c?ctx:null,base:+x.valor,mostra,valores:x.valores}:null;
-  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);areaVista=nomeVisto=!!x;alvoRolar=null;
+  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);passo=0;parar();
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
   $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):c?ctx:MES_ATUAL;
@@ -551,8 +604,8 @@ document.addEventListener('click',e=>{
   const x=S.fixos.find(f=>f.id===row.dataset.id);
   if(!(x&&x.meta&&abrirMeta(x.meta)))abrirGasto(row.dataset.id);
 });
-$('#gForm').onsubmit=e=>{e.preventDefault();if(noMes){proximo();return}const v=parse($('#gValor').value);
-  if(!v||!catSel){closeSheet($('#sheetPag'));proximo();return}
+$('#gForm').onsubmit=e=>{e.preventDefault();if(noMes){proximo(true);return}const v=parse($('#gValor').value);
+  if(!v||!catSel){closeSheet($('#sheetPag'));proximo(true);return}
   const ed=editando, item=itemDoForm(v);
   let msg='Gasto de todo mês adicionado';
   if(gPag==='parc')msg=`${gN}x de ${fmt(item.valor)} adicionado`;

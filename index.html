@@ -117,11 +117,16 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 /* bottom sheet */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s;z-index:20}
 .scrim.on{opacity:1;pointer-events:auto}
-/* com o teclado do celular aberto, a janela fica em cima dele (--teclado) e nunca mais alta que o que sobra de tela (--visivel) */
-.sheet{position:fixed;left:0;right:0;bottom:var(--teclado,0px);z-index:21;transform:translateY(105%);visibility:hidden;transition:transform .5s cubic-bezier(.22,1,.36,1),visibility 0s .5s,bottom .25s ease-out;
+/* com o teclado do celular aberto, a janela fica em cima dele: a borda de baixo vai até onde ele começa (--base, contada do alto
+   da tela, que não muda quando o Android encolhe a página) e ela nunca fica mais alta que o que sobra de tela (--visivel).
+   Ela sobe e desce no ritmo do teclado (--tec); --tt zera a animação quando a página só rolou por baixo do teclado */
+:root{--tec:cubic-bezier(.25,.9,.3,1)}
+.sheet{position:fixed;left:0;right:0;bottom:calc(100% - var(--base,100%));z-index:21;transform:translateY(105%);visibility:hidden;transition:transform .5s cubic-bezier(.22,1,.36,1),visibility 0s .5s,bottom var(--tt,.36s) var(--tec);
   padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-.sheet.on{transform:none;visibility:visible;transition:transform .5s cubic-bezier(.22,1,.36,1),bottom .25s ease-out}
-.sheet .in{max-width:520px;margin:0 auto;background:var(--surface);border-radius:32px 32px 0 0;padding:10px 20px calc(22px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;max-height:min(88vh,calc(var(--visivel,100vh) - 16px));overflow:auto}
+.sheet.on{transform:none;visibility:visible;transition:transform .5s cubic-bezier(.22,1,.36,1),bottom var(--tt,.36s) var(--tec)}
+/* o fundo da janela continua por baixo dela, atrás do teclado: enquanto o teclado sobe ou desce, nunca aparece um vão entre os dois */
+.sheet::after{content:"";position:absolute;top:calc(100% - 1px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);max-width:520px;margin:0 auto;height:100vh;background:var(--surface);pointer-events:none}
+.sheet .in{max-width:520px;margin:0 auto;background:var(--surface);border-radius:32px 32px 0 0;padding:10px 20px calc(22px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;max-height:min(calc(var(--alto,100vh) * .88),calc(var(--visivel,100vh) - 16px));overflow:auto}
 .teclado .sheet .in{padding-bottom:16px}
 .grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:4px auto 0}
 .sheet h3{font-size:1.3rem}
@@ -154,7 +159,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--r-pill);font-weight:600;font-size:.88rem;transition:all .4s var(--spring);z-index:30;pointer-events:none;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
-.teclado .toast{bottom:calc(var(--teclado) + 16px)}
+.teclado .toast{bottom:calc(100% - var(--base,100%) + 16px)}
 .save{font-size:.75rem;color:var(--muted);text-align:center}
 .save.erro{color:var(--bad);font-weight:700}
 
@@ -255,7 +260,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .sheet-top h3{flex:1;min-width:0}
 .back{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:var(--r-pill);padding:9px 14px 9px 9px;font-weight:700;font-size:.88rem;flex:none}
 .back svg{width:18px;height:18px}
-.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s,max-height .25s ease-out}
+.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s,max-height var(--tt,.36s) var(--tec),padding-bottom var(--tt,.36s) var(--tec)}
 /* janela que ficou atrás de outra: recua e apaga um pouco */
 .sheet.atras{pointer-events:none}
 .sheet.atras .in{transform:scale(.94) translateY(-10px);filter:brightness(.55)}
