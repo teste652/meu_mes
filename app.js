@@ -346,8 +346,9 @@ document.addEventListener('pointerdown',e=>{const b=e.target.closest('.press');i
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pilha.length)closeSheet(pilha[pilha.length-1])});
 
 /* ---------- sheets ---------- */
-// areaVista: a pessoa já passou pela área (tocou numa, ou o Próximo já mostrou a sugerida). Até lá, o Próximo para nela
-let catSel=null, catAuto=false, areaVista=false, editando=null;
+// o Próximo vai uma parte por vez: valor, O que é, área e, só então, Como você paga.
+// nomeVisto: a pessoa já passou pelo O que é; areaVista: já passou pela área (tocou numa, ou o Próximo já mostrou a sugerida)
+let catSel=null, catAuto=false, nomeVisto=false, areaVista=false, editando=null;
 $('#gCats').innerHTML=CATS.map(c=>`<button type="button" class="press" data-cat="${c.k}" aria-pressed="false" style="--cc:${color(c.k)}"><i style="background:${color(c.k)}">${svg(c.k)}</i>${c.n}</button>`).join('');
 // gasto: só um mês, todo mês (água, luz) ou parcelado (o valor é o total e vira parcelas nos meses certos)
 // no parcelado, a primeira parcela pode vencer no mês seguinte ao do dinheiro que paga (gVence=1, salvo como vence:1)
@@ -366,7 +367,16 @@ function setPag(p){gPag=p;const seg=$('#gPagSeg');seg.querySelector('.pill').sty
 const corpos=[...document.querySelectorAll('#gForm .corpo')];
 const sombra=c=>c.classList.toggle('mais',c.scrollTop+c.clientHeight<c.scrollHeight-4);
 corpos.forEach(c=>c.addEventListener('scroll',()=>sombra(c),{passive:true}));
-if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>sombra(e.target.closest('.corpo'))));corpos.forEach(c=>[c,...c.children].forEach(k=>ro.observe(k)))}
+// o Próximo leva até cada parte rolando devagar só o meio da janela (nunca a janela inteira), com a parte logo abaixo do título
+const devagar=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
+function rolarAte(el){const c=el&&el.closest('.corpo');if(!c)return;
+  const topo=c.scrollTop+el.getBoundingClientRect().top-c.getBoundingClientRect().top-6;
+  c.scrollTo({top:Math.max(0,Math.min(topo,c.scrollHeight-c.clientHeight)),behavior:devagar()})}
+// o teclado abrindo ou fechando muda o tamanho do meio: logo depois de um Próximo, a rolagem acompanha até a parte certa
+let alvoRolar=null, alvoAte=0;
+function seguirAte(el){alvoRolar=el;alvoAte=performance.now()+800;rolarAte(el)}
+if(window.ResizeObserver){const ro=new ResizeObserver(es=>{es.forEach(e=>sombra(e.target.closest('.corpo')));if(alvoRolar&&performance.now()<alvoAte)rolarAte(alvoRolar)});
+  corpos.forEach(c=>[c,...c.children].forEach(k=>ro.observe(k)))}
 // com juros, a parcela segue a tabela price (a mesma conta das lojas e dos bancos)
 const gTaxa=()=>gPag==='parc'&&gVM==='total'?taxa($('#gJuros').value):0;
 const valorParcela=v=>{const j=gTaxa();return gVM==='parc'?v:Math.round((j?v*j/(1-Math.pow(1+j,-gN)):v/gN)*100)/100};
@@ -435,18 +445,21 @@ function setCat(k,auto){const antes=catSel;catSel=k;catAuto=!!(k&&auto);if(k&&!a
   if(!l.classList.contains('pick'))l.textContent=catAuto?'Área sugerida':'Área'}
 // enquanto a pessoa não toca numa área, ela acompanha o que vai sendo escrito
 $('#gNome').addEventListener('input',e=>{if(catSel&&!catAuto)return;const k=areaPeloNome(e.target.value);if(k||catAuto)setCat(k,true)});
-// no celular o Enter fecha o teclado e mostra as áreas; no computador o foco vai pra elas (tracejado, que não parece área escolhida)
+// no celular o Próximo fecha o teclado e desce até as áreas; no computador o foco vai pra elas (tracejado, que não parece área escolhida)
 const toque=()=>matchMedia('(pointer:coarse)').matches;
-function verAreas(el){if(toque()){document.activeElement?.blur();el.scrollIntoView({block:'nearest',behavior:'smooth'})}else el.focus()}
+function verAreas(el){if(toque())document.activeElement?.blur();else el.focus({preventScroll:true});seguirAte($('#gAreaLbl').closest('.field'))}
+function irValor(){$('#gValor').focus({preventScroll:true});seguirAte($('#gValor').closest('.field'))}
+function irNome(){nomeVisto=true;$('#gNome').focus({preventScroll:true});seguirAte($('#gNome').closest('.field'))}
+$('#gNome').addEventListener('focus',()=>{nomeVisto=true});
 function pedirArea(){const l=$('#gAreaLbl');l.classList.add('pick');l.textContent='Escolha a área';verAreas($('#gCats').querySelector('button'))}
 // a área que o app achou pelo nome fica marcada, mas quem confirma é a pessoa: o primeiro Próximo só mostra, o segundo segue
 function mostrarArea(){const b=$('#gCats [aria-pressed="true"]');if(!b)return pedirArea();
   areaVista=true;b.classList.remove('realce');void b.offsetWidth;b.classList.add('realce');verAreas(b)}
-// Enter: valor -> o que é -> área (a pessoa confere a sugerida, igual ao botão Próximo) -> próximo; na segunda janela, o Enter adiciona
+// Enter: valor -> o que é -> área (a pessoa confere a sugerida), igual ao botão Próximo -> como paga; na segunda janela, o Enter adiciona
 $('#gForm').addEventListener('keydown',e=>{
   if(e.key!=='Enter'||e.isComposing)return;
   const t=e.target;
-  if(t.id==='gValor'){e.preventDefault();if(!parse(t.value)){toast('Coloque um valor');return}$('#gNome').focus();return}
+  if(t.id==='gValor'){e.preventDefault();if(!parse(t.value)){toast('Coloque um valor');return}irNome();return}
   if(t.id==='gNome'){e.preventDefault();proximo();return}
   const chip=t.closest&&t.closest('#gCats button');
   if(chip){e.preventDefault();setCat(chip.dataset.cat);proximo()}
@@ -473,9 +486,10 @@ function teclado(){if(!vv||vv.scale>1.01)return;
   const vis=Math.round(vv.height),k=baixo+'/'+vis;if(k===tecAntes)return;tecAntes=k;
   const raiz=document.documentElement;raiz.style.setProperty('--teclado',baixo+'px');raiz.style.setProperty('--visivel',vis+'px');raiz.classList.toggle('teclado',baixo>0);
   // depois que a janela sobe (e encolhe, se for alta), o campo em que está digitando continua à vista dentro dela
-  const a=document.activeElement,box=a&&a.closest('.sheet.on .in');
+  // (na janela do gasto quem rola é o meio; a janela inteira nunca rola, senão o título e o botão pulam)
+  const a=document.activeElement,box=a&&a.matches('input')&&(a.closest('.sheet.on .corpo')||a.closest('.sheet.on .in:not(.fixo)'));
   if(box)setTimeout(()=>{const r=a.getBoundingClientRect(),q=box.getBoundingClientRect();
-    if(r.bottom>q.bottom-12)box.scrollTop+=r.bottom-q.bottom+12;else if(r.top<q.top+12)box.scrollTop-=q.top+12-r.top},300)}
+    const d=r.bottom>q.bottom-12?r.bottom-q.bottom+12:r.top<q.top+12?r.top-q.top-12:0;if(d)box.scrollBy({top:d,behavior:devagar()})},300)}
 if(vv){vv.addEventListener('resize',teclado);vv.addEventListener('scroll',teclado);teclado()}
 // o voltar do celular fecha a janela de cima, e só com todas fechadas sai do app:
 // cada janela aberta ganha uma entrada no histórico, que guarda quantas estavam abertas
@@ -495,9 +509,11 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-back]');if
 $('#scrim').onclick=()=>{if(pilha.length)closeSheet(pilha[pilha.length-1])};
 $('#gCats').onclick=e=>{const b=e.target.closest('button');if(b)setCat(b.dataset.cat)};
 
-// Próximo (o botão e o do teclado): primeiro leva pra área, a sugerida ou a escolher; com a área vista, abre por cima a janela de como paga
+// Próximo (o botão e o do teclado): leva até a próxima parte que falta (O que é, depois a área, a sugerida ou a escolher);
+// com tudo visto, abre por cima a janela de como paga
 function proximo(){
-  if(!parse($('#gValor').value)){$('#gValor').focus();toast('Coloque um valor');return}
+  if(!parse($('#gValor').value)){irValor();toast('Coloque um valor');return}
+  if(!nomeVisto){irNome();return}
   if(!catSel){pedirArea();toast('Escolha a área');return}
   if(!areaVista){mostrarArea();return}
   if(noMes){salvarNoMes();return}
@@ -511,7 +527,7 @@ function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymPars
   // o valor que aparece é o daquele mês (o de todo mês pode ter um valor só daquele mês)
   const mostra=!x?0:noMes?valorEm(x,c.y,c.m):todoMes(x)&&ativo(x,Y0,M0)?valorEm(x,Y0,M0):+x.valor;
   editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado,ctx:c?ctx:null,base:+x.valor,mostra,valores:x.valores}:null;
-  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);areaVista=!!x;
+  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);areaVista=nomeVisto=!!x;alvoRolar=null;
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
   $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):c?ctx:MES_ATUAL;

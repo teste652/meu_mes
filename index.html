@@ -255,15 +255,17 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .sheet-top h3{flex:1;min-width:0}
 .back{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:var(--r-pill);padding:9px 14px 9px 9px;font-weight:700;font-size:.88rem;flex:none}
 .back svg{width:18px;height:18px}
-.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s}
+.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s,max-height .25s ease-out}
 /* janela que ficou atrás de outra: recua e apaga um pouco */
 .sheet.atras{pointer-events:none}
 .sheet.atras .in{transform:scale(.94) translateY(-10px);filter:brightness(.55)}
 /* janelas do gasto: o Voltar e o botão principal ficam sempre à vista; só o meio rola */
-.sheet .in.fixo{overflow:hidden}
+.sheet .in.fixo{overflow:hidden;overflow:clip}
 .fixo .corpo{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:16px;margin:-4px -20px;padding:4px 20px}
-.fixo .pe{flex:none;display:flex;flex-direction:column;gap:12px}
-.fixo .corpo.mais{-webkit-mask-image:linear-gradient(#000 calc(100% - 36px),transparent);mask-image:linear-gradient(#000 calc(100% - 36px),transparent)}
+.fixo .pe{flex:none;display:flex;flex-direction:column;gap:12px;position:relative}
+/* o esmaecido fica por cima, no pé (uma máscara no meio deixava a rolagem pesada no celular) */
+.fixo .pe::before{content:"";position:absolute;left:-20px;right:-20px;bottom:100%;height:40px;background:linear-gradient(to bottom,transparent,var(--surface));pointer-events:none;opacity:0;transition:opacity .2s}
+.fixo .corpo.mais+.pe::before{opacity:1}
 #gVMLbl{font-size:.88rem}
 #gVMLbl b{color:var(--ink);font-family:var(--display);font-weight:800}
 .parc-opts{display:flex;flex-direction:column;gap:14px}
