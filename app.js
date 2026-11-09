@@ -369,29 +369,22 @@ const sombra=c=>c.classList.toggle('mais',c.scrollTop+c.clientHeight<c.scrollHei
 corpos.forEach(c=>c.addEventListener('scroll',()=>sombra(c),{passive:true}));
 if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>sombra(e.target.closest('.corpo'))));
   corpos.forEach(c=>[c,...c.children].forEach(k=>ro.observe(k)))}
-// o Próximo leva até cada parte rolando devagar só o meio da janela (nunca a janela inteira), com a parte logo abaixo do título.
-// A rolagem é do próprio app, quadro a quadro: enquanto a janela sobe ou desce com o teclado, ela vai junto até a parte certa,
-// sem recomeçar a cada quadro (a rolagem do navegador recomeça e engasga). Um toque da pessoa no meio para tudo
-const calmo=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
-let rolando=null;
-function parar(){if(rolando){cancelAnimationFrame(rolando.q);rolando=null}}
-function rolar(c,alvo){parar();if(!c)return;
-  const ini=c.scrollTop,t0=performance.now(),dur=calmo()?0:420,r={};rolando=r;
-  const quadro=agora=>{if(rolando!==r)return;
-    const max=c.scrollHeight-c.clientHeight,y=Math.max(0,Math.min(alvo(ini),max)),p=dur?Math.min(1,(agora-t0)/dur):1;
-    c.scrollTop=ini+(y-ini)*(1-Math.pow(1-p,3));
-    // depois de chegar, segue mais um pouco: a janela ainda pode estar mudando de tamanho com o teclado
-    if(agora-t0<1100)r.q=requestAnimationFrame(quadro);else rolando=null};
-  r.q=requestAnimationFrame(quadro)}
+// o Próximo leva até cada parte rolando só o meio da janela (nunca a janela inteira), com a parte logo abaixo do título.
+// A rolagem é a do próprio celular, que anda sozinha sem ocupar o app; como a janela não muda de tamanho com o teclado,
+// o lugar certo não muda no meio do caminho. Um toque da pessoa no meio para a rolagem
+const calmo=()=>matchMedia('(prefers-reduced-motion: reduce)').matches, suave='scrollBehavior' in document.documentElement.style;
+let rolandoAte=0;
+function rolar(c,y){if(!c)return;y=Math.round(Math.max(0,Math.min(y,c.scrollHeight-c.clientHeight)));
+  if(Math.abs(y-c.scrollTop)<2)return;
+  if(calmo()||!suave)c.scrollTop=y;else{c.scrollTo({top:y,behavior:'smooth'});rolandoAte=performance.now()+700}}
 const caixa=el=>el&&(el.closest('.sheet.on .corpo')||el.closest('.sheet.on .in:not(.fixo)'));
 const dentro=(el,c)=>c.scrollTop+el.getBoundingClientRect().top-c.getBoundingClientRect().top;
 // a parte logo abaixo do título
-function seguirAte(el){const c=caixa(el);if(c)rolar(c,()=>dentro(el,c)-6)}
+function seguirAte(el){const c=caixa(el);if(c)rolar(c,dentro(el,c)-6)}
 // só o necessário pro campo tocado ficar à vista (acima do teclado e do botão)
 function mostrarCampo(el){const c=caixa(el);if(!c)return;
-  rolar(c,ini=>{const y=dentro(el,c),h=el.getBoundingClientRect().height,v=c.clientHeight;
-    return y-12<ini?y-12:y+h+12>ini+v?y+h+12-v:ini})}
-['touchstart','wheel'].forEach(ev=>document.addEventListener(ev,e=>{if(rolando&&e.target.closest&&e.target.closest('.corpo,.sheet .in'))parar()},{passive:true}));
+  const ini=c.scrollTop,y=dentro(el,c),h=el.getBoundingClientRect().height,v=c.clientHeight;
+  rolar(c,y-12<ini?y-12:y+h+12>ini+v?y+h+12-v:ini)}
 // com juros, a parcela segue a tabela price (a mesma conta das lojas e dos bancos)
 const gTaxa=()=>gPag==='parc'&&gVM==='total'?taxa($('#gJuros').value):0;
 const valorParcela=v=>{const j=gTaxa();return gVM==='parc'?v:Math.round((j?v*j/(1-Math.pow(1+j,-gN)):v/gN)*100)/100};
@@ -491,57 +484,91 @@ function arrumarPilha(){pilha.forEach((el,i)=>{const atras=i<pilha.length-1;el.s
   $('#scrim').classList.toggle('on',pilha.length>0)}
 // campo que abre o teclado do celular
 const campo=el=>!!el&&!!el.matches&&el.matches('input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=file]),textarea')&&!el.readOnly&&!el.disabled;
-function open(id,foco){const el=$(id);if(!pilha.includes(el))pilha.push(el);el.classList.add('on');arrumarPilha();historico();
+function open(id,foco){const el=$(id),novo=!el.classList.contains('on');if(!pilha.includes(el))pilha.push(el);
   const alvo=foco?$(foco):el.querySelector('input:not([type="hidden"])');
-  // com o tamanho do teclado já conhecido, a janela sobe direto até onde ele vai ficar e o teclado sobe junto: um movimento só
-  const junto=campo(alvo)&&prever(alvo);
+  // a janela que abre num campo já nasce do tamanho que vai ter com o teclado. Com o tamanho dele já conhecido, ela sobe
+  // direto até onde ele vai ficar e o teclado sobe junto: um movimento só
+  el._r=campo(alvo)&&vv&&toque()?reservaDe(el):0;
+  const junto=campo(alvo)&&prever(alvo);if(!junto)geo(el,true);
+  // o que mudou dentro dela enquanto estava fechada (a área marcada, o jeito de pagar) já fica pronto, sem animar escondido,
+  // e ela parte de onde está agora, embaixo da tela
+  if(novo){if(el.getAnimations)el.getAnimations({subtree:true}).forEach(x=>{if('transitionProperty' in x)try{x.finish()}catch(e){}});else getComputedStyle(el).visibility}
+  el.classList.add('on');arrumarPilha();historico();
   setTimeout(()=>alvo?.focus({preventScroll:true}),junto?120:350)}
 function fechar(el){const i=pilha.indexOf(el);if(i>=0)pilha.splice(i,1);el.classList.remove('on','atras');el.inert=false}
 function closeSheet(el){fechar(el);arrumarPilha();document.activeElement?.blur();historico()}
 function closeSheets(){[...pilha].forEach(fechar);arrumarPilha();document.activeElement?.blur();historico()}
-// O teclado do celular. A janela aberta fica com a borda de baixo bem onde o teclado começa (--base, contada do alto da tela)
-// e nunca mais alta que o que sobra de tela (--visivel). No iPhone o teclado cobre a página; no Android a página encolhe.
-// Contada do alto, a janela fica parada nos dois quando a página muda de tamanho, e só se mexe quando o app manda, devagar.
+// O teclado do celular. A janela aberta não muda de tamanho com ele: a que abre num campo já guarda embaixo o lugar do maior
+// teclado dos campos dela e só desliza pra cima e pra baixo junto com o teclado (deslizar o celular faz sem esforço; mudar o
+// tamanho ou a posição na página faz ele recalcular a tela a cada quadro, e num celular simples isso engasga).
+// A borda de baixo é contada do alto da tela, que não muda quando o Android encolhe a página.
 // O celular só conta o tamanho do teclado quando ele já subiu (ou quase): por isso o app guarda o tamanho de cada teclado
-// (o de números é mais baixo) e move a janela já no toque, junto com o teclado. Quando o celular conta, só ajusta se precisar
-const vv=window.visualViewport, raiz=document.documentElement;
+// (o de números é mais baixo) e move a janela já no toque, junto com o teclado. Quando o celular conta, só ajusta se precisar.
+// Tudo isso mexe só nas janelas abertas, nunca na página toda
+const vv=window.visualViewport;
 let tec={};try{tec=JSON.parse(localStorage.getItem('meu-mes-teclado'))||{}}catch(e){}
-let livre=innerHeight, largura=innerWidth, aplicado={base:-1,vis:-1}, previsto=null, espera=0;
+// base: onde o teclado começa (ou o fim da tela), contado do alto
+let livre=innerHeight, largura=innerWidth, base=innerHeight, alto=-1, medido=-1, previsto=null, espera=0, folga=0, tBaixo='';
 const chaveTec=el=>(/^(decimal|numeric)$/.test(el.inputMode)||el.type==='number'?'num':'txt')+(innerWidth>innerHeight?'-deitado':'');
 const guardarTec=()=>{try{localStorage.setItem('meu-mes-teclado',JSON.stringify(tec))}catch(e){}};
-function por(base,vis,seco){const s=raiz.style;aplicado={base,vis};
-  if(seco)s.setProperty('--tt','0s');
-  s.setProperty('--base',base+'px');s.setProperty('--visivel',vis+'px');s.setProperty('--alto',livre+'px');
-  s.setProperty('--teclado',Math.max(0,innerHeight-base)+'px');raiz.classList.toggle('teclado',livre-base>120);
-  if(seco){document.querySelectorAll('.sheet.on .in').forEach(i=>getComputedStyle(i).maxHeight);s.removeProperty('--tt')}}
+// a barra de gestos embaixo da tela (iPhone e alguns Android): com o teclado fechado, o botão fica acima dela
+function medirFolga(){const p=document.createElement('div');p.style.cssText='position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px)';
+  document.body.append(p);folga=Math.round(parseFloat(getComputedStyle(p).paddingBottom)||0);p.remove()}
+// o tamanho do teclado de um campo: o que o app já mediu; na primeira vez, num celular em pé, um tamanho comum
+const kDe=el=>{const t=chaveTec(el);return tec[t]!=null?tec[t]:innerWidth<600&&innerHeight>innerWidth?Math.round(livre*(t==='num'?.4:.46)):0};
+// o maior teclado dos campos da janela (os escondidos não contam)
+function reservaDe(s){let r=0;s.querySelectorAll('input,textarea').forEach(i=>{if(campo(i)&&!i.closest('[hidden]'))r=Math.max(r,kDe(i))});return r>120?r:0}
+// a janela no lugar: o tamanho só muda quando muda o lugar guardado pro teclado (raro, e aí devagar); o resto é deslizar
+function geo(s,seco){if(!vv)return;const g=s._g||(s._g={}),R=s._r||0,B=livre-R,t=Math.round(base-B-(R&&livre-base<=120?folga:0));
+  if(g.B!==B||g.R!==R){const i=s.querySelector('.in');
+    if(g.B!=null&&!seco&&s.classList.contains('on')){s.classList.add('ajusta');clearTimeout(g.aj);g.aj=setTimeout(()=>s.classList.remove('ajusta'),450)}
+    s.style.bottom=`calc(100% - ${B}px)`;s.style.setProperty('--sobra',R+'px');
+    i.style.maxHeight=Math.round(Math.min(livre*.88,B-16))+'px';i.style.paddingBottom=R?'16px':'';g.B=B;g.R=R}
+  if(g.t!==t){g.t=t;if(seco)s.style.setProperty('--tt','0s');s.style.translate=`0 ${t}px`;
+    if(seco){getComputedStyle(s).translate;s.style.removeProperty('--tt')}}}
+function aplicar(seco){pilha.forEach(s=>geo(s,seco));
+  // o aviso aparece acima do teclado
+  const b=livre-base>120?`calc(100% - ${base}px + 16px)`:'';if(b!==tBaixo){tBaixo=b;$('#toast').style.bottom=b}}
 function medir(forcar){if(!vv||vv.scale>1.01)return;
-  if(innerWidth!==largura){largura=innerWidth;livre=0}
+  const virou=innerWidth!==largura;if(virou){largura=innerWidth;livre=0;previsto=null;clearTimeout(espera);medirFolga()}
   // (a parte visível nunca passa da página: um número estranho do celular, logo ao abrir, não estraga a conta)
-  const base=Math.min(innerHeight,Math.round(vv.offsetTop+vv.height)), vis=Math.min(base,Math.round(vv.height)), a=document.activeElement, aberto=toque()&&livre-base>120;
-  if(!aberto)livre=base;
-  else if(campo(a)){const t=chaveTec(a),k=Math.round(livre-base);if(tec[t]!==k){tec[t]=k;guardarTec()}}
-  // enquanto o teclado ainda sobe (ou desce), o que o celular conta pode ser o de antes: a janela espera ele chegar
-  if(previsto&&!forcar){if(aberto!==previsto.aberto&&performance.now()<previsto.ate)return;previsto=null;clearTimeout(espera)}
+  const b=Math.min(innerHeight,Math.round(vv.offsetTop+vv.height)), h=Math.round(vv.height), a=document.activeElement, aberto=toque()&&livre-b>120;
+  // enquanto o teclado ainda sobe, desce ou troca de tipo, o que o celular conta pode ser o de antes (o mesmo da última vez):
+  // a janela espera ele chegar, e o app não aprende um tamanho errado
+  if(previsto&&!forcar){if(performance.now()<previsto.ate&&(aberto!==previsto.aberto||b===medido))return;previsto=null;clearTimeout(espera)}
+  medido=b;
+  if(!aberto)livre=b;
+  else if(campo(a)){const t=chaveTec(a),k=Math.round(livre-b),palpite=tec[t]==null;if(tec[t]!==k){tec[t]=k;guardarTec()}
+    const s=a.closest('.sheet.on'),g=s&&s._g;
+    if(s&&g&&g.t!=null&&Math.abs(b-(g.B+g.t))>2){const i=s.querySelector('.in'),cheia=Math.abs(i.offsetHeight-(g.B-16))<2;
+      // na primeira vez o tamanho do teclado era um palpite: a janela cheia fica com o alto onde está e só a borda de baixo
+      // vai até o teclado (uma vez só; depois o app já sabe e ela só desliza)
+      if(palpite&&s._r>0&&cheia)s._r=k+g.t;
+      // um teclado maior que o lugar guardado (emojis, outro teclado): a janela abre mais espaço pra caber acima dele
+      else if(k>(s._r||0)+2&&i.offsetHeight>b-16)s._r=k}}
+  // virou o celular: o lugar guardado é o do teclado deitado (ou em pé)
+  if(virou)pilha.forEach(s=>{if(s._r)s._r=reservaDe(s)});
   // a página só rolou por baixo do teclado (o tamanho é o mesmo): a janela vai junto na hora, senão descola do teclado
-  const mudou=aplicado.vis!==vis;por(base,vis,!mudou&&aplicado.base!==base);
+  const pan=h===alto&&b!==base, mudou=b!==base;alto=h;base=b;aplicar(pan);
   // o teclado mudou de tamanho sem trocar de campo (outro idioma, emojis): o campo continua à vista
-  if(mudou&&aberto&&campo(a)&&!rolando)mostrarCampo(a)}
+  // (se o app já está rolando até a parte certa, deixa terminar)
+  if(mudou&&!pan&&aberto&&campo(a)&&performance.now()>rolandoAte)mostrarCampo(a)}
 // um campo vai ganhar o foco (o teclado vai subir, ou trocar de tipo) ou perder (vai descer): a janela já vai pro lugar
 function prever(el){if(!vv||!toque())return false;
   let k=0;
-  // na primeira vez, num celular em pé, um tamanho de teclado comum; depois, o que ele mediu
-  if(el){const t=chaveTec(el);k=tec[t]!=null?tec[t]:innerWidth<600&&innerHeight>innerWidth?Math.round(livre*(t==='num'?.4:.46)):0;if(k<=120)return false}
-  else if(livre-aplicado.base<=120)return false;
-  const base=livre-k;previsto={aberto:k>0,ate:performance.now()+1500};
+  if(el){k=kDe(el);if(k<=120)return false;
+    // uma janela que abriu sem teclado e não cabe acima dele: guarda o lugar dele
+    const s=el.closest('.sheet');if(s&&(s._r||0)<k&&s.querySelector('.in').offsetHeight>livre-k-16)s._r=k}
+  else if(livre-base<=120)return false;
+  base=livre-k;previsto={aberto:k>0,ate:performance.now()+1500};
   clearTimeout(espera);espera=setTimeout(()=>{const a=document.activeElement;
     // o teclado não apareceu (um teclado de verdade ligado no celular, por exemplo): da próxima vez a janela não sobe sozinha
-    if(k&&campo(a)&&livre-(vv.offsetTop+vv.height)<=120){tec[chaveTec(a)]=0;guardarTec()}
+    if(k&&campo(a)&&livre-(vv.offsetTop+vv.height)<=120){tec[chaveTec(a)]=0;guardarTec();const s=a.closest('.sheet');if(s)s._r=reservaDe(s)}
     previsto=null;medir(true)},1500);
-  if(Math.abs(base-aplicado.base)>=1)por(base,base,false);
-  return k>0}
+  aplicar(false);return k>0}
 document.addEventListener('focusin',e=>{const a=e.target;if(!campo(a)||!a.closest('.sheet.on'))return;prever(a);if(toque())mostrarCampo(a)});
 document.addEventListener('focusout',e=>{if(campo(e.target)&&!campo(e.relatedTarget))prever(null)});
-if(vv){vv.addEventListener('resize',()=>medir());vv.addEventListener('scroll',()=>medir());medir()}
+if(vv){medirFolga();vv.addEventListener('resize',()=>medir());vv.addEventListener('scroll',()=>medir());medir()}
 // o voltar do celular fecha a janela de cima, e só com todas fechadas sai do app:
 // cada janela aberta ganha uma entrada no histórico, que guarda quantas estavam abertas
 let voltando=0;
@@ -580,7 +607,7 @@ function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymPars
   // o valor que aparece é o daquele mês (o de todo mês pode ter um valor só daquele mês)
   const mostra=!x?0:noMes?valorEm(x,c.y,c.m):todoMes(x)&&ativo(x,Y0,M0)?valorEm(x,Y0,M0):+x.valor;
   editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado,ctx:c?ctx:null,base:+x.valor,mostra,valores:x.valores}:null;
-  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);passo=0;parar();
+  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);passo=0;
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
   $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):c?ctx:MES_ATUAL;
