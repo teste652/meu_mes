@@ -27,24 +27,25 @@
   --c-contas:#7aa8dc; --c-comida:#eda25a; --c-transporte:#a98ce6; --c-pessoal:#cfa58a; --c-compras:#e783ad; --c-lazer:#5cc6c0; --c-reserva:#94c46a; --c-investir:#dcbd6a;
   --c-saude:#66d0a0; --c-educacao:#97a3f2; --c-dividas:#a3afc2; --c-projetos:#cf93e3; --c-assinaturas:#5ec4e4; --c-outros:#5d5f67;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.28);
-  --display:"Bricolage Grotesque",ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
-  --body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --display:"Montserrat",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"Montserrat",system-ui,-apple-system,"Segoe UI",sans-serif;
   --r-xl:30px; --r-lg:22px; --r-md:16px; --r-pill:999px;
-  --spring:cubic-bezier(.34,1.56,.64,1);
+  --s:cubic-bezier(.4,0,.2,1);
   color-scheme:dark;
 }
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.wrap{max-width:480px;margin:0 auto;padding-block:18px 120px;display:flex;flex-direction:column;gap:16px}
+.wrap{max-width:480px;margin:0 auto;padding-block:18px calc(var(--dock,96px) + 16px);display:flex;flex-direction:column;gap:16px}
+html{scroll-padding-bottom:calc(var(--dock,96px) + 8px)}
 h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
 .num{font-family:var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
 /* clique que afunda e volta */
-.press{transition:transform .38s var(--spring),background-color .2s,box-shadow .2s;will-change:transform;touch-action:manipulation}
+.press{transition:transform .25s var(--s),background-color .2s,box-shadow .2s;touch-action:manipulation}
 .press.down{transform:scale(.92);transition:transform .09s ease-out}
 .press.down.soft{transform:scale(.97)}
 
@@ -63,7 +64,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .big{font-size:clamp(2.6rem,12vw,3.4rem);font-weight:800;line-height:1}
 .big small{font-size:.45em;font-weight:700;opacity:.75;margin-right:4px;vertical-align:.55em}
 .bar{display:flex;height:14px;border-radius:var(--r-pill);overflow:hidden;background:color-mix(in srgb,currentColor 16%,transparent);gap:2px}
-.bar span{display:block;height:100%;transition:width .7s cubic-bezier(.22,1,.36,1);border-radius:var(--r-pill)}
+.bar span{display:block;height:100%;transition:width .5s var(--s);border-radius:var(--r-pill)}
 .bar .b-fix,.legend .i-fix{background:currentColor}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;font-weight:600}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:4px;margin-right:6px;vertical-align:-1px}
@@ -78,24 +79,26 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .sec-head p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
 .sec-head .grow{flex:1;min-width:0}
 .chev{width:38px;height:38px;border-radius:14px;background:var(--surface-2);display:grid;place-items:center;flex:none}
-.chev svg{transition:transform .45s var(--spring)}
+.chev svg{transition:transform .3s var(--s)}
 .open .chev svg{transform:rotate(180deg)}
-.collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s cubic-bezier(.22,1,.36,1)}
-.open .collapse{grid-template-rows:1fr}
-.collapse>div{overflow:hidden;min-height:0}
+/* o que abre e fecha (gastos de uma área, campos do parcelado): a altura anda na curva S e o de dentro some de verdade quando fecha */
+.collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows .32s var(--s)}
+.open>.collapse,.collapse.open{grid-template-rows:1fr}
+.collapse>div{overflow:hidden;min-height:0;visibility:hidden;transition:visibility 0s .32s}
+.open>.collapse>div,.collapse.open>div{visibility:visible;transition-delay:0s}
 
 @keyframes rise{to{opacity:1;transform:none}}
 .row .dot.investir{background:linear-gradient(140deg,#e2c46f,#8c6a1c)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
 
 /* listas */
 .list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
-.row{display:flex;align-items:center;gap:12px;padding:10px 14px 10px 12px;border-radius:var(--r-lg);background:var(--surface-2);animation:rise .4s cubic-bezier(.22,1,.36,1) both}
-.row.leaving{animation:leave .3s ease-in forwards}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px 10px 12px;border-radius:var(--r-lg);background:var(--surface-2);animation:rise .32s var(--s) both}
+.row.leaving{animation:leave .25s var(--s) forwards}
 @keyframes leave{to{opacity:0;transform:scale(.9);height:0;padding-block:0;margin-block:-4px}}
 .row .dot{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none}
 .row .dot svg{width:17px;height:17px}
 .row .tx{flex:1;min-width:0}
-.row .tx b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .tx b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-weight:600;overflow:hidden;line-height:1.25;overflow-wrap:anywhere}
 .row .tx span{font-size:.78rem;color:var(--muted)}
 .row .val{font-weight:700}
 .x{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:var(--muted);flex:none}
@@ -107,15 +110,15 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .chip-btn.primary{background:var(--accent-soft);color:var(--ink)}
 
 /* barra inferior */
-.dock{position:fixed;left:0;right:0;bottom:0;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
-  background:linear-gradient(to top,var(--bg) 60%,transparent);z-index:5}
+.dock{position:fixed;left:0;right:0;bottom:0;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(to top,var(--bg) 72%,transparent);z-index:5}
 .dock .in{max-width:480px;margin:0 auto;display:flex;gap:10px}
 .fab{flex:1;background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:17px 20px;font-weight:700;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
 .fab svg{width:20px;height:20px}
 .fab.ghost{flex:none;width:58px;padding:0;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 
 /* bottom sheet */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s;z-index:20}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s var(--s);z-index:20}
 .scrim.on{opacity:1;pointer-events:auto}
 /* com o teclado do celular aberto, a janela fica em cima dele. O app põe a borda de baixo dela (contada do alto da tela, que não
    muda quando o Android encolhe a página) e o tamanho uma vez, ao abrir; depois ela só desliza (translate) no ritmo do teclado
@@ -124,20 +127,20 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 @property --sobra{syntax:'<length>';inherits:false;initial-value:0px}
 @property --tt{syntax:'<time>';inherits:false;initial-value:.36s}
 :root{--tec:cubic-bezier(.25,.9,.3,1)}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;transform:translateY(calc(105% + var(--sobra,0px)));visibility:hidden;transition:transform .5s cubic-bezier(.22,1,.36,1),visibility 0s .5s;
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;transform:translateY(calc(105% + var(--sobra,0px)));visibility:hidden;transition:transform .42s var(--s),visibility 0s .42s;
   padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-.sheet.on{transform:none;visibility:visible;will-change:transform;transition:transform .5s cubic-bezier(.22,1,.36,1),translate var(--tt,.36s) var(--tec)}
+.sheet.on{transform:none;visibility:visible;will-change:transform;transition:transform .42s var(--s),translate var(--tt,.36s) var(--tec)}
 /* raro: o lugar guardado pro teclado mudou com a janela aberta (o teclado era maior, ou não apareceu): aí ela muda de tamanho devagar */
-.sheet.on.ajusta{transition:transform .5s cubic-bezier(.22,1,.36,1),translate var(--tt,.36s) var(--tec),bottom .36s var(--tec)}
+.sheet.on.ajusta{transition:transform .42s var(--s),translate var(--tt,.36s) var(--tec),bottom .36s var(--tec)}
 /* o fundo da janela continua por baixo dela, atrás do teclado: enquanto o teclado sobe ou desce, nunca aparece um vão entre os dois */
 .sheet::after{content:"";position:absolute;top:calc(100% - 1px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);max-width:520px;margin:0 auto;height:100vh;background:var(--surface);pointer-events:none}
 .sheet .in{max-width:520px;margin:0 auto;background:var(--surface);border-radius:32px 32px 0 0;padding:10px 20px calc(22px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;max-height:88vh;overflow:auto}
 .grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:4px auto 0}
 .sheet h3{font-size:1.3rem}
 .seg{display:flex;background:var(--surface-2);border-radius:var(--r-pill);padding:4px;position:relative}
-.seg button{flex:1;padding:11px 8px;border-radius:var(--r-pill);font-weight:700;font-size:.88rem;position:relative;z-index:1;color:var(--muted);transition:color .25s}
+.seg button{flex:1;padding:11px 8px;border-radius:var(--r-pill);font-weight:700;font-size:.88rem;position:relative;z-index:1;color:var(--muted);transition:color .2s var(--s)}
 .seg button[aria-pressed="true"]{color:var(--ink)}
-.seg .pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:var(--surface);border-radius:var(--r-pill);box-shadow:var(--shadow);transition:transform .42s cubic-bezier(.34,1.12,.64,1)}
+.seg .pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:var(--surface);border-radius:var(--r-pill);box-shadow:var(--shadow);transition:transform .3s var(--s)}
 .seg.right .pill{transform:translateX(100%)}
 .seg.three .pill{width:calc((100% - 8px)/3)}
 .seg.three button{padding-inline:4px;font-size:.84rem}
@@ -155,13 +158,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 /* a área escolhida fica na cor dela; o foco do teclado é tracejado, pra não parecer escolhida */
 .chips button[aria-pressed="true"]{border-color:var(--cc,var(--ink));background:color-mix(in srgb,var(--cc,var(--ink)) 24%,var(--surface-2));font-weight:700}
 .chips button:focus-visible{outline:2px dashed var(--muted);outline-offset:3px}
-.chips button.realce{animation:realce .6s var(--spring)}
+.chips button.realce{animation:realce .45s var(--s)}
 @keyframes realce{40%{transform:scale(1.08)}}
 #gAreaLbl.pick{color:var(--warn)}
 .go{background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:17px;font-weight:700;font-size:1rem}
 .go:disabled{opacity:.45}
 
-.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--r-pill);font-weight:600;font-size:.88rem;transition:transform .4s var(--spring),opacity .4s var(--spring);z-index:30;pointer-events:none;white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--r-pill);font-weight:600;font-size:.88rem;transition:transform .3s var(--s),opacity .3s var(--s);z-index:30;pointer-events:none;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .save{font-size:.75rem;color:var(--muted);text-align:center}
 .save.erro{color:var(--bad);font-weight:700}
@@ -197,7 +200,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .andares .fim b{color:var(--hero)}
 .andares .neg b{color:var(--bad)}
 .chart{display:flex;align-items:flex-end;gap:3px;height:96px;margin-top:8px}
-.chart span{flex:1;min-width:2px;border-radius:6px 6px 3px 3px;transition:height .6s cubic-bezier(.22,1,.36,1)}
+.chart span{flex:1;min-width:2px;border-radius:6px 6px 3px 3px;transition:height .45s var(--s)}
 .chart-x{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);font-weight:600}
 .leg2{display:flex;gap:14px;font-size:.78rem;color:var(--muted);font-weight:600;flex-wrap:wrap}
 .leg2 i{display:inline-block;width:10px;height:10px;border-radius:4px;margin-right:6px;vertical-align:-1px}
@@ -231,13 +234,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .dres .sb b{color:var(--hero)}
 .dres.neg .sb b{color:var(--bad)}
 .split-bar{display:flex;gap:2px;height:8px;border-radius:var(--r-pill);overflow:hidden;background:var(--line);margin:4px 0 2px}
-.split-bar span{display:block;height:100%;border-radius:var(--r-pill);transition:width .6s cubic-bezier(.22,1,.36,1)}
+.split-bar span{display:block;height:100%;border-radius:var(--r-pill);transition:width .45s var(--s)}
 .d-gasto{background:color-mix(in srgb,var(--ink) 55%,transparent)}
 .d-sobra{background:var(--hero)}
 .d-falta{background:var(--bad)}
 /* os gastos do mês: um embaixo do outro, com folga, separados do resumo por uma linha. Cada um é um botão que abre o gasto */
 .mini{display:flex;flex-direction:column;gap:18px;margin-top:4px;padding-top:16px;border-top:1px solid var(--line)}
-.mini .ln{display:flex;align-items:center;gap:12px;font-size:.92rem;min-width:0;width:calc(100% + 16px);margin:-6px -8px;padding:6px 8px;border-radius:14px;text-align:left}
+.mini .ln{display:flex;align-items:center;gap:10px;font-size:.92rem;min-width:0;width:calc(100% + 16px);margin:-6px -8px;padding:6px 8px;border-radius:14px;text-align:left}
 @media (hover:hover){.mini .ln:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}}
 .mini .ln.off{opacity:.5}
 .mini .ln .chv{width:16px;height:16px;margin-left:-4px}
@@ -249,7 +252,9 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 @media (max-width:340px){.add-mes svg{display:none}}
 .mini i{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:#fff;flex:none}
 .mini i svg{width:15px;height:15px}
-.mini .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;overflow-wrap:break-word}
+.mini .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;overflow-wrap:anywhere}
+.mini .t>span:first-child{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.mini [data-todo] .t>span:first-child{white-space:nowrap}
 .mini .t small{font-size:.8rem;color:var(--muted);font-weight:600}
 /* nada some cortado: o nome quebra linha; só a lista do "Todo mês" termina em reticências */
 .mini .t small.lista{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -263,8 +268,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .sheet-top h3{flex:1;min-width:0}
 .back{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:var(--r-pill);padding:9px 14px 9px 9px;font-weight:700;font-size:.88rem;flex:none}
 .back svg{width:18px;height:18px}
-.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s}
-.sheet.ajusta .in{transition:transform .45s cubic-bezier(.22,1,.36,1),filter .45s,max-height .36s var(--tec),padding-bottom .36s var(--tec)}
+.sheet .in{box-shadow:0 -12px 40px rgba(0,0,0,.12);transform-origin:50% 0;transition:transform .42s var(--s),filter .42s var(--s)}
+.sheet.ajusta .in{transition:transform .42s var(--s),filter .42s var(--s),max-height .36s var(--tec),padding-bottom .36s var(--tec)}
 /* janela que ficou atrás de outra: recua e apaga um pouco */
 .sheet.atras{pointer-events:none}
 .sheet.atras .in{transform:scale(.94) translateY(-10px);filter:brightness(.55)}
@@ -288,7 +293,14 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .parc-res small{font-size:.86rem}
 .so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 /* como você paga: mais espaço entre as partes e letra maior, pra ler sem esforço */
-#sheetPag .corpo,#sheetPag .parc-opts{gap:30px}
+#sheetPag .corpo{gap:30px}
+#sheetPag .parc-opts{gap:0}
+#sheetPag .dobra>div{display:flex;flex-direction:column;gap:30px;transition:opacity .25s var(--s),visibility 0s .32s;opacity:0}
+#sheetPag .dobra.open>div{opacity:1;transition-delay:0s}
+.quieto .collapse,.quieto .collapse>div,.quieto .pill{transition:none!important}
+#gParcA>div>:last-child{margin-bottom:30px}
+#gParcB>div{gap:0}
+#gParcB>div>:first-child,#gJurosD>div>:first-child{margin-top:30px}
 #sheetPag .field{gap:10px}
 #sheetPag .field label{font-size:.92rem}
 /* o valor em destaque, pra ver bem o número, com mais folga até os botões */
@@ -303,41 +315,47 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 /* para onde vai o dinheiro */
 .onde{display:grid;grid-template-columns:132px 1fr;gap:16px;align-items:center;margin-top:14px}
 .donut{position:relative;width:132px;height:132px}
-.donut svg{width:100%;height:100%;transform:rotate(-90deg)}
-.donut circle{fill:none;stroke-width:16;transition:stroke-dasharray .6s cubic-bezier(.22,1,.36,1),stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)}
+.donut svg{width:100%;height:100%}
+.donut circle{fill:none;stroke-width:16}
+.donut .fatia{stroke-linecap:round}
+.donut .ponto{stroke:none}
 .donut .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.1}
-.donut .c b{font-family:var(--display);font-weight:800;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.donut .c b{font-family:var(--display);font-weight:800;font-size:1rem;font-variant-numeric:tabular-nums;white-space:nowrap;max-width:88px}
+.donut .c b small{font-size:.8em}
+.donut .c b small:first-child{margin-right:2px}
 .donut .c span{font-size:.7rem;color:var(--muted);font-weight:600}
 .leg-onde{display:flex;flex-direction:column;gap:10px;min-width:0;margin:0;padding:0;list-style:none}
-.leg-onde li{display:flex;align-items:center;gap:8px;min-width:0}
-.leg-onde i{width:10px;height:10px;border-radius:3px;flex:none}
-.leg-onde b{flex:1;min-width:0;font-size:.84rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.leg-onde li{display:flex;align-items:flex-start;gap:8px;min-width:0;line-height:1.2}
+.leg-onde i{width:10px;height:10px;border-radius:3px;flex:none;margin-top:3px}
+.leg-onde b{flex:1;min-width:0;font-size:.84rem;font-weight:700;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .leg-onde small{font-size:.84rem;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .onde .empty{grid-column:1/-1}
 /* tela estreita: a rosca diminui pra legenda caber inteira e, mais estreita ainda, a legenda vai pra baixo */
-@media (max-width:380px){.onde{grid-template-columns:116px 1fr;gap:14px}.donut{width:116px;height:116px}.donut .c b{font-size:.95rem}}
+@media (max-width:380px){.onde{grid-template-columns:116px 1fr;gap:14px}.donut{width:116px;height:116px}.donut .c b{font-size:.9rem;max-width:76px}}
 @media (max-width:340px){.onde{grid-template-columns:1fr;justify-items:center}.leg-onde{width:100%}}
 /* embaixo da rosca, o botão que abre os gastos de cada área */
 #areasBtn{margin-top:18px}
 /* gastos por área: uma linha por área com a barra na cor dela; tocando, abrem embaixo os gastos que entram nela */
-.a-sub{margin:-6px 0 0;color:var(--muted);font-size:.9rem;font-weight:600}
-.a-sub b{color:var(--ink);font-weight:800}
-.areas{display:flex;flex-direction:column;gap:8px}
+.a-sub{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:-4px 0 2px;color:var(--muted);font-size:.9rem;font-weight:600}
+.a-sub b{color:var(--ink);font-family:var(--display);font-size:1.3rem;font-weight:800;white-space:nowrap}
+.areas{display:flex;flex-direction:column;gap:10px}
 .area{background:var(--surface-2);border-radius:var(--r-lg);padding:12px 14px 12px 12px}
 .area-h{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
 .area-h i{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none}
 .area-h i svg{width:17px;height:17px}
 .area-h .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
-.area-h .t b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.area-h .t small{font-size:.78rem;color:var(--muted);font-weight:600}
+.area-h .t b{font-weight:700;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.area-h .t small{font-size:.76rem;color:var(--muted);font-weight:500}
 .area-h>.num{font-weight:800;white-space:nowrap}
-.chv{width:18px;height:18px;color:var(--muted);flex:none;transition:transform .45s var(--spring)}
+.chv{width:18px;height:18px;color:var(--muted);flex:none;transition:transform .3s var(--s)}
 .area.open .chv,[aria-expanded="true"]>.chv{transform:rotate(180deg)}
-.abar{display:block;height:6px;border-radius:var(--r-pill);background:var(--line);overflow:hidden;margin:10px 0 0 46px}
-.abar span{display:block;height:100%;border-radius:inherit;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.abar{display:block;height:4px;border-radius:var(--r-pill);background:var(--line);overflow:hidden;margin:9px 0 0 46px}
+.abar span{display:block;height:100%;border-radius:inherit;transition:width .45s var(--s)}
 .aitens{list-style:none;margin:0;padding:14px 0 2px 46px;display:flex;flex-direction:column;gap:12px}
 .aitens li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.9rem;min-width:0}
-.aitens .t{display:flex;flex-direction:column;min-width:0;line-height:1.25;overflow-wrap:break-word}
+.aitens li>b{flex:none}
+.aitens .t{display:flex;flex-direction:column;min-width:0;line-height:1.25;overflow-wrap:anywhere}
+.aitens .t>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .aitens small{font-size:.78rem;color:var(--muted);font-weight:600}
 .aitens b{white-space:nowrap;font-weight:700}
 
@@ -349,9 +367,10 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .cmeses .cm small{font-size:.7em;font-weight:700;opacity:.6;margin-left:3px}
 .cmeses .cv{font-size:clamp(1rem,4.6vw,1.2rem);font-weight:700;white-space:nowrap;max-width:100%}
 .cmeses .cv small{font-size:.75em;opacity:.7;margin-right:2px}
+.cmeses .cv small.cc{opacity:.85;margin:0}
 .cmeses .cv.over{color:var(--bad)}
 .cmeses .cmt{display:block;align-self:stretch;height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:5px}
-.cmeses .cmt span{display:block;height:100%;border-radius:inherit;background:var(--hero);transition:width .5s cubic-bezier(.22,1,.36,1)}
+.cmeses .cmt span{display:block;height:100%;border-radius:inherit;background:var(--hero);transition:width .45s var(--s)}
 .cmeses .cmt span.over{background:var(--bad)}
 .cmeses .cdots{position:absolute;top:-3px;right:-3px;display:flex;gap:2px}
 .cmeses .cdots i{width:14px;height:14px;border-radius:50%;background:var(--c-compras);border:2px solid var(--surface)}
@@ -399,8 +418,9 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .lembrete .li{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;color:#fff;background:var(--c-reserva);grid-row:span 2;align-self:start}
 .lembrete .li svg{width:18px;height:18px}
 .lembrete p{margin:0;font-size:.88rem;font-weight:600;line-height:1.35}
-.lembrete .x{grid-row:span 2;align-self:start;margin-top:-4px}
-.lembrete .sim{grid-column:2;justify-self:start;background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:9px 15px;font-weight:700;font-size:.86rem}
+.lembrete .x{align-self:start;margin-top:-4px}
+.lembrete .sim{grid-column:2/4;justify-self:start;margin-right:6px;background:var(--hero);color:var(--hero-ink);border-radius:var(--r-pill);padding:9px 15px;font-weight:700;font-size:.86rem}
+@media (max-width:340px){.lembrete .sim{font-size:.8rem;padding:9px 12px}}
 /* o mês virou: o mesmo cartão do lembrete, com o nome do mês em cima da pergunta e dois botões */
 .virada .li{background:var(--hero);color:var(--hero-ink)}
 .virada p b{display:block;font-family:var(--display);font-size:1.02rem;font-weight:800}
@@ -413,11 +433,11 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .metas{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .meta{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left;padding:13px 14px;border-radius:var(--r-lg);background:var(--surface-2)}
 .meta .mt,.meta .ms{display:flex;justify-content:space-between;align-items:baseline;gap:10px;min-width:0}
-.meta .mt b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.meta .mt b{font-weight:700;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;min-width:0}
 .meta .mt .num{font-weight:800;flex:none}
 .meta .mbar{display:block;height:8px;border-radius:var(--r-pill);background:var(--line);overflow:hidden}
-.meta .mbar span{display:block;height:100%;border-radius:inherit;transition:width .6s cubic-bezier(.22,1,.36,1)}
-.meta .ms{font-size:.8rem;color:var(--muted);font-weight:600}
+.meta .mbar span{display:block;height:100%;border-radius:inherit;transition:width .45s var(--s)}
+.meta .ms{font-size:.8rem;color:var(--muted);font-weight:600;flex-wrap:wrap;row-gap:2px}
 .meta .ms span:last-child{flex:none}
 .meta.feita .mt .num{color:var(--hero)}
 .metas .empty{text-align:left}
@@ -595,6 +615,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
         <button type="button" data-pag="parc" aria-pressed="false">Parcelado</button>
       </div>
       <div class="parc-opts" id="gParcOpts">
+        <div class="collapse dobra" id="gParcA"><div>
         <div class="field" id="gVMF">
           <label id="gVMLbl"></label>
           <div class="seg" id="gVMSeg">
@@ -612,11 +633,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
           </div>
         </div>
         <div class="parc-res" id="gParcRes" aria-live="polite"></div>
+        </div></div>
         <div class="field">
           <label for="gInicioBtn" id="gMesLbl">Sai do dinheiro de</label>
           <input id="gInicio" type="hidden">
           <button type="button" class="mes-btn press soft" id="gInicioBtn" data-mes-for="gInicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="4"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
         </div>
+        <div class="collapse dobra" id="gParcB"><div>
         <div class="field" id="gVenceF">
           <label id="gVenceLbl">Primeira parcela vence em</label>
           <div class="seg" id="gVenceSeg" role="group" aria-labelledby="gVenceLbl">
@@ -625,10 +648,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
             <button type="button" data-vence="1" aria-pressed="false"></button>
           </div>
         </div>
+        <div class="collapse dobra" id="gJurosD"><div>
         <div class="field" id="gJurosF">
           <label for="gJuros">Juros por mês <span class="opt">(opcional)</span></label>
           <div class="pctf"><input id="gJuros" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0"><span>% ao mês</span></div>
         </div>
+        </div></div>
+        </div></div>
       </div>
     </div>
     <div class="pe">
@@ -649,16 +675,16 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     </div>
     <div class="field">
       <label for="tValor">Quero juntar</label>
-      <div class="money"><span>R$</span><input id="tValor" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="5.000"></div>
+      <div class="money"><span>R$</span><input id="tValor" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="5.000,00"></div>
     </div>
     <div class="row2">
       <div class="field">
         <label for="tMes">Guardo por mês</label>
-        <div class="money sm"><span>R$</span><input id="tMes" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="300"></div>
+        <div class="money sm"><span>R$</span><input id="tMes" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="300,00"></div>
       </div>
       <div class="field">
         <label for="tJa">Já tenho <span class="opt">(opcional)</span></label>
-        <div class="money sm"><span>R$</span><input id="tJa" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="0"></div>
+        <div class="money sm"><span>R$</span><input id="tJa" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="0,00"></div>
       </div>
     </div>
     <div class="field">

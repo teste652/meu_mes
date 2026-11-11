@@ -1,10 +1,7 @@
 As fontes desta pasta são usadas pelo Meu Mês sob a SIL Open Font License 1.1 (texto abaixo).
 
-Bricolage Grotesque (bricolage-grotesque-*.woff2)
-Copyright 2022 The Bricolage Grotesque Project Authors (https://github.com/ateliertriay/bricolage)
-
-Plus Jakarta Sans (plus-jakarta-sans-*.woff2)
-Copyright 2020 The Plus Jakarta Sans Project Authors (https://github.com/tokotype/PlusJakartaSans)
+Montserrat (montserrat-latin.woff2)
+Copyright 2024 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

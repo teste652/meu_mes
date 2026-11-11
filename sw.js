@@ -1,6 +1,6 @@
 // Meu Mês: guarda o app no celular pra abrir sem internet
-const VERSAO='meu-mes-v39';
-const ARQUIVOS=['./','index.html','privacidade.html','privacidade.js','app.js','instalar.js','fonts/fontes.css','fonts/bricolage-grotesque-latin.woff2','fonts/plus-jakarta-sans-latin.woff2','manifest.webmanifest','icon-192.png','icon-512.png','apple-touch-icon.png'];
+const VERSAO='meu-mes-v40';
+const ARQUIVOS=['./','index.html','privacidade.html','privacidade.js','app.js','instalar.js','fonts/fontes.css','fonts/montserrat-latin.woff2','manifest.webmanifest','icon-192.png','icon-512.png','apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSAO).then(c=>c.addAll(ARQUIVOS)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSAO).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 // o que está guardado; abrir a página sem internet sempre cai no app

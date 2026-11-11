@@ -125,13 +125,40 @@ function tipoNoMes(x,y,m){if(x.meta)return 'Meta';
   if(x.parcelas&&x.inicio){const i=ymParse(x.inicio),n=idxMes(y,m)-idxMes(i.y,i.m)+1;return n===x.parcelas?'Última parcela':`Parcela ${n} de ${esc(x.parcelas)}`}
   return x.mes?'Só neste mês':'Todo mês'}
 const fmt=v=>brl.format(v||0);
-const brl0=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
-const fmt0=v=>brl0.format(Math.round(v||0));
-// sem o ,00 quando o valor é redondo
-const fmtS=v=>Math.round(v*100)%100?fmt(v):fmt0(v);
+// nos cartões grandes (meses, rosca) o R$ e os centavos ficam menores: "R$ 12.421,88" com o 12.421 em destaque
+const fmtPartes=v=>{const [i,c]=fmt(v).replace(/^R\$\s?/,'').split(',');return `<small>R$</small>${i}<small class="cc">,${c}</small>`};
+// o que vai pra dentro de um campo: 1.234,56 (sem R$, que já está desenhado ao lado); vazio quando é zero
+const fmtCampo=v=>v?(+v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
 // "2.800" e "1.234.567" usam ponto de milhar; "2.80" e "2,80" são centavos
 const parse=s=>{s=String(s||'').replace(/[^\d,.-]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');const n=parseFloat(s);return isFinite(n)&&n>0?Math.round(n*100)/100:0};
 const uid=()=>Math.random().toString(36).slice(2,9);
+// campos de dinheiro: os pontos de milhar aparecem enquanto a pessoa digita (1234 vira 1.234); a vírgula, ou o ponto do teclado
+// numérico, separa os centavos (até dois). O cursor fica onde estava, contando só dígitos e vírgula; apagar sobre um ponto
+// apaga o dígito do lado; colar "R$ 1.234,56" ou "1234.56" entra arrumado. O que é guardado continua vindo do parse()
+function porValor(el,v){el.value=fmtCampo(v);el.dataset.v=el.value}
+function dinheiro(el){
+  const arrumar=e=>{
+    const raw=el.value, prev=el.dataset.v||'', tipo=e&&e.inputType||'';let caret=el.selectionStart??raw.length, s=raw;
+    if(tipo==='insertFromPaste'||tipo==='insertFromDrop'){porValor(el,parse(raw));return}
+    const umAMais=raw.length===prev.length+1&&raw.slice(0,caret-1)+raw.slice(caret)===prev;
+    const umAMenos=raw.length===prev.length-1;
+    // digitou ponto ou vírgula: é o separador dos centavos
+    if(umAMais&&(raw[caret-1]==='.'||raw[caret-1]===','))s=raw.slice(0,caret-1)+','+raw.slice(caret);
+    // apagou um ponto de milhar: apaga o dígito de antes (ou de depois, com o Delete)
+    else if(umAMenos&&tipo==='deleteContentBackward'&&prev[caret]==='.'&&raw===prev.slice(0,caret)+prev.slice(caret+1)){s=raw.slice(0,caret-1)+raw.slice(caret);caret--}
+    else if(umAMenos&&tipo==='deleteContentForward'&&prev[caret]==='.'&&raw===prev.slice(0,caret)+prev.slice(caret+1))s=raw.slice(0,caret)+raw.slice(caret+1);
+    // sem vírgula, um ponto no fim (ou com um ou dois dígitos depois) é o separador dos centavos; os outros pontos são de milhar
+    if(!s.includes(',')){const m=s.match(/\.(\d{0,2})$/);if(m)s=s.slice(0,m.index)+','+m[1]}
+    const antes=s.slice(0,caret).replace(/[^\d,]/g,'').length, so=s.replace(/[^\d,]/g,''), iv=so.indexOf(','),
+      inteiro=(iv<0?so:so.slice(0,iv)).replace(/^0+(?=\d)/,'').slice(0,12).replace(/\B(?=(\d{3})+(?!\d))/g,'.'),
+      novo=inteiro+(iv<0?'':','+so.slice(iv+1).replace(/,/g,'').slice(0,2));
+    el.dataset.v=novo;if(novo===raw)return;
+    let n=0,pos=0;while(pos<novo.length&&n<antes){if(/[\d,]/.test(novo[pos]))n++;pos++}
+    el.value=novo;try{el.setSelectionRange(pos,pos)}catch(x){}};
+  el.addEventListener('input',arrumar);
+  el.addEventListener('focus',()=>{el.dataset.v=el.value});
+  el.addEventListener('blur',()=>porValor(el,parse(el.value)))}
+['#gValor','#sValor','#tValor','#tMes','#tJa'].forEach(id=>dinheiro($(id)));
 const sum=a=>a.reduce((t,x)=>t+(+x.valor||0),0);
 
 $('#mes').textContent=new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -143,15 +170,22 @@ function tween(el,to){
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(el.id==='livre'){el.innerHTML=money(to,el);caber(el)}
   if(from===to||reduce){el.innerHTML=money(to,el);return}
-  const t0=performance.now(),d=700;
-  (function step(t){const p=Math.min(1,(t-t0)/d),e=1-Math.pow(1-p,3);el.innerHTML=money(from+(to-from)*e,el);if(p<1&&shown.get(el)===to)requestAnimationFrame(step)})(t0);
+  const t0=performance.now(),d=600;
+  (function step(t){const p=Math.min(1,(t-t0)/d),e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;el.innerHTML=money(from+(to-from)*e,el);if(p<1&&shown.get(el)===to)requestAnimationFrame(step)})(t0);
 }
-function caber(el,min=18,passo=2){el.style.fontSize='';let f=parseFloat(getComputedStyle(el).fontSize);while(el.scrollWidth>el.clientWidth&&f>min){f-=passo;el.style.fontSize=f+'px'}}
+// a letra diminui até o texto caber: primeiro um salto na proporção que falta (uma medida só), depois o ajuste fino
+function caber(el,min=18,passo=2){el.style.fontSize='';let f=parseFloat(getComputedStyle(el).fontSize);
+  if(el.scrollWidth>el.clientWidth){f=Math.max(min,Math.floor(f*el.clientWidth/el.scrollWidth/passo)*passo);el.style.fontSize=f+'px'}
+  while(el.scrollWidth>el.clientWidth&&f>min){f-=passo;el.style.fontSize=f+'px'}}
 // o Sai e o Sobra do detalhe do mês ficam lado a lado: a letra diminui até caber; só se nem assim couber, um desce
 function caberDres(){const el=$('#cDet .dres');if(!el||!el.clientWidth)return;el.classList.remove('quebra');caber(el,10.5,.5);if(el.scrollWidth>el.clientWidth)el.classList.add('quebra')}
-addEventListener('resize',()=>{caber($('#livre'));caberDres()});
+// o total no meio da rosca diminui até caber no miolo
+function caberOnde(){const b=$('#onde .c b');if(b&&b.clientWidth)caber(b,11,.5)}
+// só a largura muda o que cabe; o teclado muda só a altura, e aí não há o que medir de novo
+let larguraTela=innerWidth;
+addEventListener('resize',()=>{if(innerWidth===larguraTela)return;larguraTela=innerWidth;caber($('#livre'));caberDres();caberOnde()});
 // a fonte chega depois do primeiro desenho e muda a largura do texto
-if(document.fonts){document.fonts.ready.then(caberDres);document.fonts.addEventListener('loadingdone',caberDres)}
+if(document.fonts){const re=()=>{caberDres();caberOnde()};document.fonts.ready.then(re);document.fonts.addEventListener('loadingdone',re)}
 function money(v,el){
   if(el.id!=='livre')return fmt(v);
   const s=fmt(Math.abs(v)).replace(/^R\$\s?/,'');
@@ -191,12 +225,12 @@ function renderAno(){const v=S.exemplo?'':anosVelhos();$('#viradaAno').hidden=!v
 // o mês virou: pergunta se o salário continua o mesmo, até a pessoa responder ou fechar
 function renderVirada(sal){
   const ver=!S.exemplo&&S.aviso===MES_ATUAL&&sal>0, n=mesNome(Y0,M0);
-  $('#virada').hidden=!ver;if(ver)$('#viradaTx').innerHTML=`<b>${n[0].toUpperCase()+n.slice(1)} começou</b>Seu salário continua <span class="num">${fmtS(sal)}</span>?`}
+  $('#virada').hidden=!ver;if(ver)$('#viradaTx').innerHTML=`<b>${n[0].toUpperCase()+n.slice(1)} começou</b>Seu salário continua <span class="num">${fmt(sal)}</span>?`}
 // some quando o mês já tem algo pra guardar, quando não sobra nada ou quando a pessoa fecha
 function renderLembrete(sal,livre){
   const v=Math.floor(Math.min(sal*.1,livre)/10)*10, tem=fixosDoMes(Y0,M0).some(f=>guarda(f.cat));
   const ver=!S.exemplo&&sal>0&&!tem&&S.lembrete!==MES_ATUAL&&v>=10;
-  $('#lembrete').hidden=!ver;if(ver){$('#lemSim').textContent=`Separar ${fmt0(v)} por mês`;$('#lemSim').dataset.v=v}}
+  $('#lembrete').hidden=!ver;if(ver){$('#lemSim').textContent=`Separar ${fmt(v)} por mês`;$('#lemSim').dataset.v=v}}
 // rosca com as maiores áreas do mês e, embaixo, o botão que abre tudo o que saiu em cada área
 function renderOnde(usado){
   const box=$('#onde'), tot=CATS.reduce((t,c)=>t+usado[c.k],0);
@@ -205,10 +239,23 @@ function renderOnde(usado){
     let fat=CATS.filter(c=>usado[c.k]>0).map(c=>({n:c.n,v:usado[c.k],cor:color(c.k)})).sort((a,b)=>b.v-a.v);
     // mais de 5 fatias fica difícil de ler: as menores viram "Outros"
     if(fat.length>5)fat=[...fat.slice(0,4),{n:'Outros',v:fat.slice(4).reduce((t,f)=>t+f.v,0),cor:'var(--c-outros)'}];
-    const r=56,C=2*Math.PI*r,gap=fat.length>1?2:0;let a=0;
-    const arcos=fat.map(f=>{const l=f.v/tot*C,el=`<circle r="${r}" cx="66" cy="66" stroke="${f.cor}" stroke-dasharray="${Math.max(.5,l-gap)} ${C}" stroke-dashoffset="${-a}"/>`;a+=l;return el}).join('');
-    box.innerHTML=`<div class="donut"><svg viewBox="0 0 132 132" aria-hidden="true"><circle r="${r}" cx="66" cy="66" stroke="var(--line)"/>${arcos}</svg><div class="c"><b>${fmt0(tot)}</b><span>no mês</span></div></div>
-      <ul class="leg-onde">${fat.map(f=>`<li><i style="background:${f.cor}"></i><b>${f.n}</b><small>${Math.round(f.v/tot*100)}%</small></li>`).join('')}</ul>`;
+    // cada fatia é um arco com as pontas redondas (a ponta reta em diagonal é o que ficava serrilhado), a primeira começando
+    // no alto e com a mesma folga entre todas. Cada arco gira até o lugar dele e começa no ponto de partida do próprio círculo.
+    // Uma fatia pequena demais pra um arco vira um pontinho no meio do lugar dela; pontinhos colados se afastam o mínimo
+    // pra todos continuarem aparecendo (os valores certos estão na legenda), e os menores ficam por cima
+    const r=56,C=2*Math.PI*r,g=3,cap=8;let a=0;
+    const pos=fat.map(f=>{const l=f.v/tot*C,p={f,l,ini:a,m:a+l/2,ponto:l<2*cap+g};a+=l;return p});
+    for(let i=0;i<pos.length;){if(!pos[i].ponto){i++;continue}let j=i;while(j+1<pos.length&&pos[j+1].ponto)j++;
+      const grupo=pos.slice(i,j+1), antes=grupo.reduce((t,p)=>t+p.m,0);
+      for(let k=1;k<grupo.length;k++)grupo[k].m=Math.max(grupo[k].m,grupo[k-1].m+10);
+      const desl=(grupo.reduce((t,p)=>t+p.m,0)-antes)/grupo.length;grupo.forEach(p=>p.m-=desl);i=j+1}
+    const giro=s=>(s/C*360-90).toFixed(2), noAnel=s=>{const t=s/C*2*Math.PI-Math.PI/2;return `cx="${(66+r*Math.cos(t)).toFixed(2)}" cy="${(66+r*Math.sin(t)).toFixed(2)}"`};
+    const arcos=fat.length===1?`<circle class="fatia" r="${r}" cx="66" cy="66" stroke="${fat[0].cor}"/>`:pos.slice().sort((x,y)=>y.l-x.l).map(p=>p.ponto
+      ?`<circle class="ponto" r="${cap}" ${noAnel(p.m)} style="fill:${p.f.cor}"/>`
+      :`<circle class="fatia" r="${r}" cx="66" cy="66" stroke="${p.f.cor}" stroke-dasharray="${(p.l-2*cap-g).toFixed(2)} ${C.toFixed(2)}" transform="rotate(${giro(p.ini+cap+g/2)} 66 66)"/>`).join('');
+    box.innerHTML=`<div class="donut"><svg viewBox="0 0 132 132" shape-rendering="geometricPrecision" aria-hidden="true"><circle r="${r}" cx="66" cy="66" stroke="var(--line)"/>${arcos}</svg><div class="c"><b class="num">${fmtPartes(tot)}</b><span>no mês</span></div></div>
+      <ul class="leg-onde">${fat.map(f=>{const pc=f.v/tot*100;return `<li><i style="background:${f.cor}"></i><b>${f.n}</b><small>${pc<.5?'&lt;1':Math.round(pc)}%</small></li>`}).join('')}</ul>`;
+    caberOnde();
   }
   $('#areasBtn').hidden=!tot;
   if($('#sheetAreas').classList.contains('on'))renderAreas();
@@ -218,19 +265,25 @@ const CHEV='<svg class="chv" viewBox="0 0 24 24" fill="none" stroke="currentColo
 // tocando, abrem embaixo os gastos que entram nela
 function renderAreas(){
   const itens=fixosDoMes(Y0,M0), tot=sum(itens), abertas=new Set([...$('#areas').querySelectorAll('.area.open')].map(a=>a.dataset.k)), n=mesLongo(Y0,M0);
-  $('#aSub').innerHTML=`${n[0].toUpperCase()+n.slice(1)} · <b class="num">${fmtS(tot)}</b> no mês`;
+  $('#aSub').innerHTML=`<span>${n[0].toUpperCase()+n.slice(1)}</span><b class="num">${fmt(tot)}</b>`;
   const areas=CATS.map(c=>({c,its:itens.filter(x=>x.cat===c.k)})).filter(a=>a.its.length).map(a=>({...a,v:sum(a.its)})).sort((a,b)=>b.v-a.v);
   $('#areas').innerHTML=areas.length?areas.map(({c,its,v})=>{const pc=v/tot*100, ab=abertas.has(c.k);
     return `<div class="area${ab?' open':''}" data-k="${c.k}">
       <button type="button" class="area-h press soft" aria-expanded="${ab}"><i style="background:${color(c.k)}">${svg(c.k)}</i>
         <span class="t"><b>${c.n}</b><small>${its.length} ${its.length===1?'gasto':'gastos'} · ${pc<.5?'&lt;1':Math.round(pc)}%</small></span>
-        <b class="num">${fmtS(v)}</b>${CHEV}</button>
+        <b class="num">${fmt(v)}</b>${CHEV}</button>
       <span class="abar" aria-hidden="true"><span style="width:${Math.max(pc,1.5)}%;background:${color(c.k)}"></span></span>
-      <div class="collapse"><div><ul class="aitens">${its.slice().sort((a,b)=>b.valor-a.valor).map(x=>`<li><span class="t"><span>${esc(x.nome)}</span><small>${tipoNoMes(x,Y0,M0)}</small></span><b class="num">${fmtS(x.valor)}</b></li>`).join('')}</ul></div></div>
+      <div class="collapse"><div><ul class="aitens">${its.slice().sort((a,b)=>b.valor-a.valor).map(x=>`<li><span class="t"><span>${esc(x.nome)}</span><small>${tipoNoMes(x,Y0,M0)}</small></span><b class="num">${fmt(x.valor)}</b></li>`).join('')}</ul></div></div>
     </div>`}).join(''):'<div class="empty">Nenhum gasto neste mês</div>'}
-$('#areasBtn').onclick=()=>{$('#areas').innerHTML='';renderAreas();open('#sheetAreas')};
+$('#areasBtn').onclick=()=>{$('#areas').innerHTML='';renderAreas();$('#sheetAreas .in').scrollTop=0;open('#sheetAreas')};
 $('#areas').onclick=e=>{const b=e.target.closest('.area-h');if(!b)return;const a=b.closest('.area'), ab=!a.classList.contains('open');
-  a.classList.toggle('open',ab);b.setAttribute('aria-expanded',ab)};
+  a.classList.toggle('open',ab);b.setAttribute('aria-expanded',ab);
+  // abrindo, a janela acompanha a lista crescendo, quadro a quadro: rola só o que falta pra ela caber,
+  // e nunca a ponto de o nome da área sair de vista
+  if(ab){const c=a.closest('.in');if(!c)return;const topo=dentro(a,c), t0=performance.now();
+    (function seguir(){const falta=topo+a.offsetHeight+10-(c.scrollTop+c.clientHeight);
+      if(falta>0)c.scrollTop=Math.min(c.scrollTop+falta,topo-8);
+      if(performance.now()-t0<400&&a.classList.contains('open'))requestAnimationFrame(seguir)})()}};
 let verTodos=false;
 // o gasto mais novo aparece primeiro
 const ordem=arr=>arr.slice().reverse();
@@ -254,7 +307,7 @@ function renderList(arr){
   });
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   antes.forEach((top,r)=>{if(!r.isConnected)return;const d=top-r.getBoundingClientRect().top;
-    if(Math.abs(d)>1)r.animate([{transform:`translateY(${d}px)`},{transform:'none'}],{duration:420,easing:'cubic-bezier(.22,1,.36,1)'})});
+    if(Math.abs(d)>1)r.animate([{transform:`translateY(${d}px)`},{transform:'none'}],{duration:320,easing:'cubic-bezier(.4,0,.2,1)'})});
 }
 $('#fixMais').onclick=()=>{verTodos=!verTodos;render()};
 
@@ -354,15 +407,23 @@ $('#gCats').innerHTML=CATS.map(c=>`<button type="button" class="press" data-cat=
 // no parcelado, a primeira parcela pode vencer no mês seguinte ao do dinheiro que paga (gVence=1, salvo como vence:1)
 let gPag='unico', gN=3, gVM='total', gVence=0;
 const PAGS=['unico','mes','parc'];
-function setPag(p){gPag=p;const seg=$('#gPagSeg');seg.querySelector('.pill').style.transform=`translateX(${PAGS.indexOf(p)*100}%)`;
+function setPag(p){gPag=p;const seg=$('#gPagSeg'), pag=$('#sheetPag'), quieto=!pag.classList.contains('on');
+  // com a janela fechada (abrindo um gasto pra editar), o seletor e os grupos só mudam de estado, sem animar escondidos
+  if(quieto)pag.classList.add('quieto');
+  seg.querySelector('.pill').style.transform=`translateX(${PAGS.indexOf(p)*100}%)`;
   seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pag===p));
   // o de todo mês mostra de quando começa; editando um que já existe, ele continua começando quando já começava
-  $('#gParcOpts').hidden=p==='mes'&&!!editando&&editando.todo;$('#gVMF').hidden=$('#gStepF').hidden=$('#gVenceF').hidden=p!=='parc';$('#gJurosF').hidden=p!=='parc'||gVM!=='total';
+  $('#gParcOpts').hidden=p==='mes'&&!!editando&&editando.todo;
+  const parc=p==='parc';$('#gParcA').classList.toggle('open',parc);$('#gParcB').classList.toggle('open',parc);$('#gJurosD').classList.toggle('open',parc&&gVM==='total');
   // o mês é o do dinheiro que paga: a conta que vence no mês que vem, paga com o salário deste, fica neste
   $('#gMesLbl').textContent=p==='parc'?'Primeira parcela sai do dinheiro de':p==='mes'?'Começa no dinheiro de':'Sai do dinheiro de';
   $('label[for="gValor"]').textContent=p!=='parc'?'Valor':gVM==='parc'?'Valor de cada parcela':'Valor total';
   const vm=$('#gVMSeg');vm.classList.toggle('right',gVM==='parc');vm.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.vm===gVM));
-  gParc();corpos.forEach(sombra)}
+  gParc();corpos.forEach(sombra);
+  if(quieto){getComputedStyle($('#gParcA')).transitionProperty;pag.classList.remove('quieto')}}
+// a barra de baixo (Adicionar gasto) é medida e vira a folga do fim da página, pro último gasto nunca ficar embaixo dela
+{const dock=$('.dock'),mede=()=>document.documentElement.style.setProperty('--dock',dock.offsetHeight+'px');
+  if(dock){mede();if(window.ResizeObserver)new ResizeObserver(mede).observe(dock,{box:'border-box'})}}
 // o meio das janelas rola: enquanto tem mais coisa embaixo, a borda de baixo some aos poucos
 const corpos=[...document.querySelectorAll('#gForm .corpo')];
 const sombra=c=>c.classList.toggle('mais',c.scrollTop+c.clientHeight<c.scrollHeight-4);
@@ -607,7 +668,7 @@ function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymPars
   // o valor que aparece é o daquele mês (o de todo mês pode ter um valor só daquele mês)
   const mostra=!x?0:noMes?valorEm(x,c.y,c.m):todoMes(x)&&ativo(x,Y0,M0)?valorEm(x,Y0,M0):+x.valor;
   editando=x?{id,taxa:x.taxa,dia:x.dia,pago:x.pago,todo:todoMes(x),desde:x.desde,criado:x.criado,ctx:c?ctx:null,base:+x.valor,mostra,valores:x.valores}:null;
-  $('#gValor').value=x?String(mostra).replace('.',','):'';$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);passo=0;
+  porValor($('#gValor'),x?mostra:0);$('#gNome').value=x?x.nome:'';$('#gJuros').value='';setCat(x?x.cat:null);passo=0;
   gN=x&&x.parcelas||3;gVM=x&&x.parcelas?'parc':'total';gVence=x&&x.parcelas&&x.vence===1?1:0;
   gPag=!x?'unico':x.parcelas?'parc':x.mes?'unico':'mes';
   $('#gInicio').dataset.min=ym(Y0-2,M0);$('#gInicio').value=x?(x.mes||x.inicio||MES_ATUAL):c?ctx:MES_ATUAL;
@@ -615,7 +676,7 @@ function abrirGasto(id,ctx){const x=id?S.fixos.find(x=>x.id===id):null, c=ymPars
   $('#gProx').textContent=noMes?'Salvar':'Próximo';
   const tirado=noMes&&fora(x,c.y,c.m);$('#gDel').hidden=!x||tirado;
   $('#gDel').textContent=noMes?`Tirar de ${nm}`:c&&x&&x.parcelas&&x.inicio?'Apagar esta compra':'Apagar este gasto';
-  $('#gDica').hidden=!noMes;if(noMes)$('#gDica').textContent=tirado?`Ele foi tirado de ${nm}. Salve pra ele voltar nesse mês.`:`Muda só o valor de ${nm}. Nos outros meses continua ${fmtS(+x.valor)}.`;
+  $('#gDica').hidden=!noMes;if(noMes)$('#gDica').textContent=tirado?`Ele foi tirado de ${nm}. Salve pra ele voltar nesse mês.`:`Muda só o valor de ${nm}. Nos outros meses continua ${fmt(+x.valor)}.`;
   corpos.forEach(c=>c.scrollTop=0);
   setPag(gPag);open('#sheetGasto')}
 // em Meses, o de todo mês muda só naquele mês: o valor fica guardado só pra ele (igual ao de todo mês, volta a ser o de todo mês).
@@ -661,7 +722,7 @@ let salMes=MES_ATUAL;
 function openSal(k=MES_ATUAL){salMes=k;const p=ymParse(k), v=salarioDe(p.y,p.m), atual=k===MES_ATUAL;
   $('#sTitle').textContent=atual?'Seu salário':`Salário de ${mesNome(p.y,p.m)}`;
   $('label[for="sValor"]').textContent=atual?'Quanto cai na conta por mês':k<MES_ATUAL?`Quanto caiu na conta em ${mesNome(p.y,p.m)}`:`Quanto vai cair na conta em ${mesNome(p.y,p.m)}`;
-  $('#sValor').value=v?String(v).replace('.',','):'';open('#sheetSal')}
+  porValor($('#sValor'),v);open('#sheetSal')}
 $('#salBtn').onclick=()=>openSal();$('#addSal').onclick=()=>openSal();
 // o salário deste mês vale também pros próximos; o de um mês que passou ou que ainda vai chegar muda só ele
 // (o mês seguinte fica com o que já tinha). Um mês que já tem um salário só dele continua só com ele
@@ -701,18 +762,18 @@ function renderMetas(){
     return `<button type="button" class="meta press soft${i.feita?' feita':''}" data-meta="${esc(t.id)}">
       <span class="mt"><b>${esc(t.nome)}</b><span class="num">${i.feita?'Meta batida':Math.floor(pc)+'%'}</span></span>
       <span class="mbar"><span style="width:${Math.max(pc,2)}%;background:${i.feita?'var(--hero)':color(t.taxa?'investir':'reserva')}"></span></span>
-      <span class="ms"><span>${i.feita?`Você juntou ${fmt0(t.valor)}`:`${fmt0(i.tem)} de ${fmt0(t.valor)}`}</span><span>${i.feita?'':`até ${mesCurto(i.fim.y,i.fim.m)}`}</span></span>
+      <span class="ms"><span>${i.feita?`Você juntou ${fmt(t.valor)}`:`${fmt(i.tem)} de ${fmt(t.valor)}`}</span><span>${i.feita?'':`até ${mesCurto(i.fim.y,i.fim.m)}`}</span></span>
     </button>`}).join('')}
 $('#metas').onclick=e=>{const b=e.target.closest('[data-meta]');if(b)abrirMeta(b.dataset.meta)};
 $('#metaNova').onclick=()=>abrirMeta();
 let metaEd=null;
 function abrirMeta(id){const t=id?(S.metas||[]).find(x=>x.id===id):null;if(id&&!t)return false;
   metaEd=t;
-  $('#tNome').value=t?t.nome:'';$('#tValor').value=t?br(t.valor):'';$('#tMes').value=t?br(t.mensal):'';
+  $('#tNome').value=t?t.nome:'';porValor($('#tValor'),t?t.valor:0);porValor($('#tMes'),t?t.mensal:0);
   // editar recomeça a conta deste mês, com o que já foi guardado até aqui
-  $('#tJa').value=t?br(Math.round(metaInfo(t).tem*100)/100):'';
+  porValor($('#tJa'),t?Math.round(metaInfo(t).tem*100)/100:0);
   $('#tTaxa').value=t&&t.taxa?br(+(t.taxa*100).toFixed(2)):'';
-  const sal=salarioDe(Y0,M0);$('#tMes').placeholder=sal?br(Math.round(sal*.1)):'300';
+  const sal=salarioDe(Y0,M0);$('#tMes').placeholder=sal?fmtCampo(Math.round(sal*.1)):'300,00';
   $('#tTitle').textContent=t?'Editar meta':'Nova meta';$('#tGo').textContent=t?'Salvar':'Criar meta';$('#tDel').hidden=!t;
   calcMetaForm();open('#sheetMeta');return true}
 function lerMeta(){return {nome:$('#tNome').value.trim()||'Minha meta',valor:parse($('#tValor').value),mensal:parse($('#tMes').value),ja:parse($('#tJa').value),inicio:MES_ATUAL,...(taxa($('#tTaxa').value)?{taxa:taxa($('#tTaxa').value)}:{})}}
@@ -737,10 +798,10 @@ function calcMetaForm(){
   const andar=(nome,v,cls)=>`<div${cls?` class="${cls}"`:''}><span>${nome}</span><b class="num">${v}</b></div>`;
   let sobra='';const sal=salarioDe(Y0,M0);
   if(sal&&!S.exemplo){const v=sal-sum(fixosDoMes(Y0,M0).filter(f=>!metaEd||f.meta!==metaEd.id))-t.mensal;
-    sobra=andar(v<0?'Passa do salário':'Sobra no mês',fmtS(Math.abs(v)),v<0?'fim neg':'fim')}
+    sobra=andar(v<0?'Passa do salário':'Sobra no mês',fmt(Math.abs(v)),v<0?'fim neg':'fim')}
   box.innerHTML=`<div class="lbl">Você chega lá em</div>
     <div class="big2">${mesLongo(fy,fm)}</div>
-    <div class="andares">${andar('Guardando por',`${p.n} ${p.n===1?'mês':'meses'}`)}${andar('Valor por mês',fmtS(t.mensal))}${rend>=1?andar('Rendimento',fmtS(rend)):''}${sobra}</div>
+    <div class="andares">${andar('Guardando por',`${p.n} ${p.n===1?'mês':'meses'}`)}${andar('Valor por mês',fmt(t.mensal))}${rend>=1?andar('Rendimento',fmt(rend)):''}${sobra}</div>
     ${graf}`;
   return t}
 ['tNome','tValor','tMes','tJa','tTaxa'].forEach(id=>$('#'+id).addEventListener('input',calcMetaForm));
@@ -754,7 +815,7 @@ $('#tForm').onsubmit=e=>{e.preventDefault();const t=calcMetaForm();
     // o que a meta guardou nos meses que passaram continua neles; o plano novo vale deste mês em diante
     const j=S.fixos.findIndex(f=>f.meta===t.id&&!f.ate), velho=S.fixos[j], it=itemDaMeta(t,j>=0?velho.id:uid());
     if(j<0)S.fixos.push(it);else S.fixos.splice(j,1,...(congelado(velho)?[{...velho,id:uid(),ate:MES_ANTERIOR}]:[]),it);
-  },ed?'Meta atualizada':`Meta criada: ${fmt0(t.mensal)} por mês nos gastos`),250)};
+  },ed?'Meta atualizada':`Meta criada: ${fmt(t.mensal)} por mês nos gastos`),250)};
 $('#tDel').onclick=()=>{const ed=metaEd;if(!ed)return;
   const i=S.metas.findIndex(x=>x.id===ed.id), j=S.fixos.findIndex(f=>f.meta===ed.id&&!f.ate), t=S.metas[i], it=S.fixos[j], fica=!!it&&congelado(it);
   // apagando a meta, o que ela já guardou nos meses que passaram continua neles
@@ -763,7 +824,7 @@ $('#tDel').onclick=()=>{const ed=metaEd;if(!ed)return;
 
 /* ---------- lembrete de guardar ---------- */
 $('#lemSim').onclick=e=>{const v=+e.currentTarget.dataset.v, id=uid();if(!v)return;
-  change(()=>{S.fixos.push({id,nome:'Guardar',valor:v,cat:'reserva',desde:MES_ATUAL,criado:MES_ATUAL})},`${fmt0(v)} por mês pra guardar`,()=>change(()=>{S.fixos=S.fixos.filter(f=>f.id!==id)},'Voltou'))};
+  change(()=>{S.fixos.push({id,nome:'Guardar',valor:v,cat:'reserva',desde:MES_ATUAL,criado:MES_ATUAL})},`${fmt(v)} por mês pra guardar`,()=>change(()=>{S.fixos=S.fixos.filter(f=>f.id!==id)},'Voltou'))};
 $('#lemX').onclick=()=>change(()=>{S.lembrete=MES_ATUAL});
 
 /* ---------- o mês virou ---------- */
@@ -839,7 +900,7 @@ function renderCal(){
     const pontos=(fins?'<i></i>':'')+(meta?'<i class="cmeta"></i>':''), nota=(fins?`, ${fins>1?`${fins} parcelas acabam`:'última parcela'}`:'')+(meta?', bate a meta':'');
     return `<button type="button" class="press${sel?' sel':''}${hoje?' hoje':''}" data-k="${x.k}" aria-pressed="${sel}" aria-label="${mesLongo(x.y,x.m)}: sai ${fmt(x.sai)}${nota}">
       <span class="cm">${MESES[x.m]}${x.y!==Y0?`<small>${String(x.y).slice(2)}</small>`:''}</span>
-      <span class="cv num${over?' over':''}"><small>R$</small>${fmt0(x.sai).replace(/^R\$\s?/,'')}</span>
+      <span class="cv num${over?' over':''}">${fmtPartes(x.sai)}</span>
       ${x.sal?`<span class="cmt"><span class="${over?'over':''}" style="width:${Math.min(100,x.sai/x.sal*100)}%"></span></span>`:''}${pontos?`<span class="cdots" aria-hidden="true">${pontos}</span>`:''}</button>`}).join('');
   const {y,m}=calSel, inf=mesInfo(y,m), k=idxMes(y,m), atual=k===kHoje, passou=k<kHoje;
   // em todo mês, também no atual, aparece um por um o que é só daquele mês
@@ -847,7 +908,7 @@ function renderCal(){
   // aqui tudo é o que sai: o valor vai sem o sinal de menos e sem o ,00
   // cada linha abre o gasto pra mudar ou tirar naquele mês; a do Todo mês abre embaixo um por um
   // (com os que foram tirados daquele mês, apagados, pra poder voltar)
-  const linha=(ic,cor,nome,sub,v,o)=>`<button type="button" class="ln press soft${o.cls||''}" ${o.attr}><i style="background:${cor}">${ic}</i><span class="t"><span>${nome}</span><small${o.lista?' class="lista"':''}>${sub}</small></span><b>${fmtS(v)}</b>${o.fim||''}</button>`;
+  const linha=(ic,cor,nome,sub,v,o)=>`<button type="button" class="ln press soft${o.cls||''}" ${o.attr}><i style="background:${cor}">${ic}</i><span class="t"><span>${nome}</span><small${o.lista?' class="lista"':''}>${sub}</small></span><b>${fmt(v)}</b>${o.fim||''}</button>`;
   const gasto=(x,sub,cls)=>linha(svg(x.cat),color(x.cat),esc(x.nome),sub,x.valor,{attr:`data-gasto="${esc(x.id)}"`,cls});
   const kM=ym(y,m), todo=inf.itens.filter(todoMes), tirados=S.fixos.filter(f=>todoMes(f)&&fora(f,y,m)&&noPeriodo(f,y,m));
   const linhas=[...inf.itens.filter(x=>!todoMes(x)).map(x=>gasto(x,tipoNoMes(x,y,m))),
@@ -860,7 +921,7 @@ function renderCal(){
       <span>${sal?`Salário <span class="num">${fmt(sal)}</span>`:'Colocar salário'}</span>${LAPIS}</button>`;
   $('#cDet').innerHTML=`<div class="lbl">${mesLongo(y,m)}${atual?' · este mês':k===kHoje-1?' · mês passado':''}</div>
     ${salBtn}
-    <div class="dres${neg?' neg':''}"><span>${passou?'Saiu':'Sai'} <b>${fmt0(inf.sai)}</b></span><span class="sb">${neg?passou?'Faltou':'Falta':passou?'Sobrou':'Sobra'} <b>${sal?fmt0(Math.abs(inf.sobra)):'—'}</b></span></div>
+    <div class="dres${neg?' neg':''}"><span>${passou?'Saiu':'Sai'} <b>${fmt(inf.sai)}</b></span><span class="sb">${neg?passou?'Faltou':'Falta':passou?'Sobrou':'Sobra'} <b>${sal?fmt(Math.abs(inf.sobra)):'—'}</b></span></div>
     <div class="split-bar" aria-hidden="true"><span class="d-gasto" style="width:${Math.min(inf.sai,sal||inf.sai)/topoM*100}%"></span>${neg?`<span class="d-falta" style="width:${(inf.sai-sal)/topoM*100}%"></span>`:`<span class="d-sobra" style="width:${Math.max(0,inf.sobra)/topoM*100}%"></span>`}</div>
     <div class="mini">${linhas}</div>
     ${metasNoMes(y,m).map(t=>`<p><b>Bate a meta “${esc(t.nome)}”</b></p>`).join('')}
