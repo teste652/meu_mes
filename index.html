@@ -38,6 +38,8 @@
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:480px;margin:0 auto;padding-block:18px calc(var(--dock,96px) + 16px);display:flex;flex-direction:column;gap:16px}
+/* a página fica por baixo das janelas: o que muda numa janela não faz o celular percorrer a página inteira de novo */
+.wrap{contain:layout style}
 html{scroll-padding-bottom:calc(var(--dock,96px) + 8px)}
 h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
 .num{font-family:var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
@@ -81,11 +83,14 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .chev{width:38px;height:38px;border-radius:14px;background:var(--surface-2);display:grid;place-items:center;flex:none}
 .chev svg{transition:transform .3s var(--s)}
 .open .chev svg{transform:rotate(180deg)}
-/* o que abre e fecha (gastos de uma área, campos do parcelado): a altura anda na curva S e o de dentro some de verdade quando fecha */
-.collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows .32s var(--s)}
-.open>.collapse,.collapse.open{grid-template-rows:1fr}
-.collapse>div{overflow:hidden;min-height:0;visibility:hidden;transition:visibility 0s .32s}
-.open>.collapse>div,.collapse.open>div{visibility:visible;transition-delay:0s}
+/* o que abre e fecha (gastos de uma área, campos do parcelado): muda de uma vez e o app faz as partes deslizarem (flip() no
+   app.js), sem animar a altura, que fazia o celular recalcular a página a cada quadro. .fica: fechando, ainda à vista até o fim */
+.collapse{display:grid;grid-template-rows:0fr;position:relative}
+.open>.collapse,.collapse.open,.collapse.fica{grid-template-rows:1fr}
+.collapse>div{overflow:hidden;min-height:0;visibility:hidden}
+.open>.collapse>div,.collapse.open>div,.collapse.fica>div{visibility:visible}
+/* cobre, com a cor da janela, a parte de um cartão (ou de uma dobra) que ainda não devia aparecer enquanto as coisas deslizam */
+.tampa{position:absolute;left:0;right:0;bottom:0;background:var(--surface);transform-origin:50% 100%;pointer-events:none}
 
 @keyframes rise{to{opacity:1;transform:none}}
 .row .dot.investir{background:linear-gradient(140deg,#e2c46f,#8c6a1c)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
@@ -277,6 +282,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .sheet .in.fixo{overflow:hidden;overflow:clip}
 .fixo .corpo{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:16px;margin:-4px -20px;padding:4px 20px}
 .fixo .pe{flex:none;display:flex;flex-direction:column;gap:12px;position:relative}
+/* o pé é da cor da janela (e continua assim até embaixo): o que desliza no meio passa por baixo dele, nunca por cima */
+.fixo .pe{background:var(--surface);box-shadow:0 40px 0 40px var(--surface)}
 /* o esmaecido fica por cima, no pé (uma máscara no meio deixava a rolagem pesada no celular) */
 .fixo .pe::before{content:"";position:absolute;left:-20px;right:-20px;bottom:100%;height:40px;background:linear-gradient(to bottom,transparent,var(--surface));pointer-events:none;opacity:0;transition:opacity .2s}
 .fixo .corpo.mais+.pe::before{opacity:1}
@@ -295,9 +302,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 /* como você paga: mais espaço entre as partes e letra maior, pra ler sem esforço */
 #sheetPag .corpo{gap:30px}
 #sheetPag .parc-opts{gap:0}
-#sheetPag .dobra>div{display:flex;flex-direction:column;gap:30px;transition:opacity .25s var(--s),visibility 0s .32s;opacity:0}
-#sheetPag .dobra.open>div{opacity:1;transition-delay:0s}
-.quieto .collapse,.quieto .collapse>div,.quieto .pill{transition:none!important}
+#sheetPag .dobra>div{display:flex;flex-direction:column;gap:30px}
+.quieto .pill{transition:none!important}
 #gParcA>div>:last-child{margin-bottom:30px}
 #gParcB>div{gap:0}
 #gParcB>div>:first-child,#gJurosD>div>:first-child{margin-top:30px}
@@ -339,7 +345,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .a-sub{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:-4px 0 2px;color:var(--muted);font-size:.9rem;font-weight:600}
 .a-sub b{color:var(--ink);font-family:var(--display);font-size:1.3rem;font-weight:800;white-space:nowrap}
 .areas{display:flex;flex-direction:column;gap:10px}
-.area{background:var(--surface-2);border-radius:var(--r-lg);padding:12px 14px 12px 12px}
+.area{position:relative;background:var(--surface-2);border-radius:var(--r-lg);padding:12px 14px 12px 12px}
 .area-h{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
 .area-h i{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none}
 .area-h i svg{width:17px;height:17px}

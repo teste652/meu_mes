@@ -258,32 +258,44 @@ function renderOnde(usado){
     caberOnde();
   }
   $('#areasBtn').hidden=!tot;
-  if($('#sheetAreas').classList.contains('on'))renderAreas();
+  // com o painel fechado, as áreas são montadas de novo quando o celular está à toa: tocar em Ver gastos por área só abre a janela
+  if($('#sheetAreas').classList.contains('on'))renderAreas();else{areasProntas=false;agendarAreas()}
 }
 const CHEV='<svg class="chv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 // gastos por área: uma linha por área, da que leva mais pra que leva menos, com a barra na cor dela;
 // tocando, abrem embaixo os gastos que entram nela
-function renderAreas(){
+function renderAreas(){acabar($('#sheetAreas'));areasProntas=true;
   const itens=fixosDoMes(Y0,M0), tot=sum(itens), abertas=new Set([...$('#areas').querySelectorAll('.area.open')].map(a=>a.dataset.k)), n=mesLongo(Y0,M0);
   $('#aSub').innerHTML=`<span>${n[0].toUpperCase()+n.slice(1)}</span><b class="num">${fmt(tot)}</b>`;
   const areas=CATS.map(c=>({c,its:itens.filter(x=>x.cat===c.k)})).filter(a=>a.its.length).map(a=>({...a,v:sum(a.its)})).sort((a,b)=>b.v-a.v);
+  // os gastos de cada área só viram linhas quando ela abre: abrir o painel monta só as áreas (com muitos gastos, montar
+  // todas as listas de uma vez segurava o celular bem na hora em que a janela sobe)
+  gastosDaArea=new Map(areas.map(a=>[a.c.k,a.its]));
   $('#areas').innerHTML=areas.length?areas.map(({c,its,v})=>{const pc=v/tot*100, ab=abertas.has(c.k);
     return `<div class="area${ab?' open':''}" data-k="${c.k}">
       <button type="button" class="area-h press soft" aria-expanded="${ab}"><i style="background:${color(c.k)}">${svg(c.k)}</i>
         <span class="t"><b>${c.n}</b><small>${its.length} ${its.length===1?'gasto':'gastos'} · ${pc<.5?'&lt;1':Math.round(pc)}%</small></span>
         <b class="num">${fmt(v)}</b>${CHEV}</button>
       <span class="abar" aria-hidden="true"><span style="width:${Math.max(pc,1.5)}%;background:${color(c.k)}"></span></span>
-      <div class="collapse"><div><ul class="aitens">${its.slice().sort((a,b)=>b.valor-a.valor).map(x=>`<li><span class="t"><span>${esc(x.nome)}</span><small>${tipoNoMes(x,Y0,M0)}</small></span><b class="num">${fmt(x.valor)}</b></li>`).join('')}</ul></div></div>
+      <div class="collapse"><div>${ab?listaDaArea(its):''}</div></div>
     </div>`}).join(''):'<div class="empty">Nenhum gasto neste mês</div>'}
-$('#areasBtn').onclick=()=>{$('#areas').innerHTML='';renderAreas();$('#sheetAreas .in').scrollTop=0;open('#sheetAreas')};
-$('#areas').onclick=e=>{const b=e.target.closest('.area-h');if(!b)return;const a=b.closest('.area'), ab=!a.classList.contains('open');
-  a.classList.toggle('open',ab);b.setAttribute('aria-expanded',ab);
-  // abrindo, a janela acompanha a lista crescendo, quadro a quadro: rola só o que falta pra ela caber,
-  // e nunca a ponto de o nome da área sair de vista
-  if(ab){const c=a.closest('.in');if(!c)return;const topo=dentro(a,c), t0=performance.now();
-    (function seguir(){const falta=topo+a.offsetHeight+10-(c.scrollTop+c.clientHeight);
-      if(falta>0)c.scrollTop=Math.min(c.scrollTop+falta,topo-8);
-      if(performance.now()-t0<400&&a.classList.contains('open'))requestAnimationFrame(seguir)})()}};
+let gastosDaArea=new Map();
+const listaDaArea=its=>`<ul class="aitens">${its.slice().sort((a,b)=>b.valor-a.valor).map(x=>`<li><span class="t"><span>${esc(x.nome)}</span><small>${tipoNoMes(x,Y0,M0)}</small></span><b class="num">${fmt(x.valor)}</b></li>`).join('')}</ul>`;
+let areasProntas=false, agendado=false;
+const ocioso=window.requestIdleCallback?f=>requestIdleCallback(f,{timeout:1500}):f=>setTimeout(f,300);
+function agendarAreas(){if(agendado)return;agendado=true;
+  ocioso(()=>{agendado=false;if(!areasProntas&&!$('#sheetAreas').classList.contains('on')){$('#areas').innerHTML='';renderAreas()}})}
+// o painel abre sempre com as áreas fechadas, do começo
+$('#areasBtn').onclick=()=>{if(!areasProntas){$('#areas').innerHTML='';renderAreas()}
+  else $('#areas').querySelectorAll('.area.open').forEach(a=>{a.classList.remove('open');a.querySelector('.area-h').setAttribute('aria-expanded','false')});
+  $('#sheetAreas .in').scrollTop=0;open('#sheetAreas')};
+// tocando numa área, os gastos dela abrem embaixo: as áreas de baixo descem e vão mostrando a lista (veja flip()).
+// Abrindo, a janela rola só o que falta pra lista caber, sem o nome da área sair de vista; um toque da pessoa para essa rolagem
+$('#areas').onclick=e=>{const b=e.target.closest('.area-h');if(!b)return;const a=b.closest('.area'), ab=!a.classList.contains('open'), dobra=a.querySelector('.collapse>div');
+  flip($('#sheetAreas'),()=>{if(ab&&!dobra.firstChild)dobra.innerHTML=listaDaArea(gastosDaArea.get(a.dataset.k)||[]);
+    a.classList.toggle('open',ab);b.setAttribute('aria-expanded',ab)},'.area','.area',
+    ab&&(fim=>{const c=a.closest('.in'), r=fim.get(a);if(!c||!r)return;const cr=c.getBoundingClientRect(), vis=cr.top+c.clientTop+c.clientHeight;
+      const falta=Math.min(r.top+r.height+10-vis, r.top-cr.top-8);if(falta>0)rolar(c,c.scrollTop+falta)}))};
 let verTodos=false;
 // o gasto mais novo aparece primeiro
 const ordem=arr=>arr.slice().reverse();
@@ -412,15 +424,20 @@ function setPag(p){gPag=p;const seg=$('#gPagSeg'), pag=$('#sheetPag'), quieto=!p
   if(quieto)pag.classList.add('quieto');
   seg.querySelector('.pill').style.transform=`translateX(${PAGS.indexOf(p)*100}%)`;
   seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pag===p));
-  // o de todo mês mostra de quando começa; editando um que já existe, ele continua começando quando já começava
-  $('#gParcOpts').hidden=p==='mes'&&!!editando&&editando.todo;
-  const parc=p==='parc';$('#gParcA').classList.toggle('open',parc);$('#gParcB').classList.toggle('open',parc);$('#gJurosD').classList.toggle('open',parc&&gVM==='total');
-  // o mês é o do dinheiro que paga: a conta que vence no mês que vem, paga com o salário deste, fica neste
-  $('#gMesLbl').textContent=p==='parc'?'Primeira parcela sai do dinheiro de':p==='mes'?'Começa no dinheiro de':'Sai do dinheiro de';
-  $('label[for="gValor"]').textContent=p!=='parc'?'Valor':gVM==='parc'?'Valor de cada parcela':'Valor total';
   const vm=$('#gVMSeg');vm.classList.toggle('right',gVM==='parc');vm.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.vm===gVM));
-  gParc();corpos.forEach(sombra);
-  if(quieto){getComputedStyle($('#gParcA')).transitionProperty;pag.classList.remove('quieto')}}
+  // os campos do parcelado abrem e fecham juntos com o resto da janela num movimento só (veja flip())
+  flip(pag,()=>{
+    // o de todo mês mostra de quando começa; editando um que já existe, ele continua começando quando já começava
+    $('#gParcOpts').hidden=p==='mes'&&!!editando&&editando.todo;
+    const parc=p==='parc';$('#gParcA').classList.toggle('open',parc);$('#gParcB').classList.toggle('open',parc);$('#gJurosD').classList.toggle('open',parc&&gVM==='total');
+    // o mês é o do dinheiro que paga: a conta que vence no mês que vem, paga com o salário deste, fica neste
+    troca($('#gMesLbl'),p==='parc'?'Primeira parcela sai do dinheiro de':p==='mes'?'Começa no dinheiro de':'Sai do dinheiro de');
+    troca($('label[for="gValor"]'),p!=='parc'?'Valor':gVM==='parc'?'Valor de cada parcela':'Valor total');
+    gParc()},'#gPagSeg,#gParcOpts>*,#sheetPag .collapse,#sheetPag .pe','#sheetPag .collapse');
+  if(!window.ResizeObserver)corpos.forEach(sombra);
+  if(quieto){getComputedStyle(seg.querySelector('.pill')).transform;pag.classList.remove('quieto')}}
+// só mexe no texto se ele mudou (texto igual também faz o celular recalcular a tela)
+const troca=(el,t)=>{if(el.textContent!==t)el.textContent=t}, trocaHTML=(el,h)=>{if(el._h!==h){el._h=h;el.innerHTML=h}};
 // a barra de baixo (Adicionar gasto) é medida e vira a folga do fim da página, pro último gasto nunca ficar embaixo dela
 {const dock=$('.dock'),mede=()=>document.documentElement.style.setProperty('--dock',dock.offsetHeight+'px');
   if(dock){mede();if(window.ResizeObserver)new ResizeObserver(mede).observe(dock,{box:'border-box'})}}
@@ -435,6 +452,70 @@ if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>sombra(e
 // o lugar certo não muda no meio do caminho. Um toque da pessoa no meio para a rolagem
 const calmo=()=>matchMedia('(prefers-reduced-motion: reduce)').matches, suave='scrollBehavior' in document.documentElement.style;
 let rolandoAte=0;
+// Abrir e fechar partes de uma janela (os gastos de uma área, os campos do parcelado) sem engasgar: animar a altura fazia o
+// celular recalcular e repintar a página inteira a cada quadro. Aqui o app mede onde cada parte está, muda tudo de uma vez
+// e cada parte sai de onde estava e desliza até o lugar novo (transform), o que o celular faz sozinho, sem ocupar o app.
+// A janela cresce ou diminui pelo alto do mesmo jeito. O que fecha continua no lugar até o fim, e o que ainda não devia
+// aparecer (o fim de uma lista que está abrindo, o que está fechando) fica embaixo de uma "tampa" da cor da janela, que
+// encolhe ou cresce junto com o deslize: o efeito é o de antes, a parte abrindo e fechando, sem a página ser refeita.
+// Um toque no meio parte de onde tudo está agora.
+// sel: as partes que se movem; tampa: as que abrem e fecham (o cartão da área, a dobra do parcelado);
+// depois(fim): roda com as posições finais
+const DUR=320, CURVA='cubic-bezier(.4,0,.2,1)';
+const abertoC=c=>c.classList.contains('open')||c.parentElement.classList.contains('open');
+// a parte está escondida: fora da tela (hidden) ou dentro de uma dobra fechada
+const escondido=(el,s,aberta)=>{if(!el.getClientRects().length)return true;for(let c=el.parentElement;c&&c!==s;c=c.parentElement)if(c.classList.contains('collapse')&&!aberta(c))return true;return false};
+function acabar(s){const f=s&&s._flip;if(!f)return;s._flip=null;
+  f.anims.forEach(a=>a.cancel());f.tampas.forEach(t=>t.remove());f.fica.forEach(c=>c.classList.remove('fica'))}
+function flip(s,mudar,sel,tampa,depois){
+  // sem animação (janela fechada ou movimento reduzido): muda na hora. Com movimento reduzido, toda mudança de estilo ainda
+  // leva uma fração de milissegundo (regra no index.html): ela é terminada já, pra posição final valer agora
+  if(!s.classList.contains('on')||calmo()||!s.animate){acabar(s);mudar();
+    if(depois){if(s.getAnimations)s.getAnimations({subtree:true}).forEach(x=>{try{x.finish()}catch(e){}});
+      depois(new Map([...s.querySelectorAll(sel)].map(b=>[b,b.getBoundingClientRect()])))}
+    return}
+  // a janela em si é o .in: com tudo medido do jeito de maior tamanho, ela só desce a partir dele (nunca sobra vão embaixo)
+  const velho=s._flip, raiz=s.querySelector('.in'), blocos=[raiz,...s.querySelectorAll(sel)], cols=[...s.querySelectorAll('.collapse')];
+  // 1. onde tudo está agora, na tela (no meio de um deslize, conta o deslize; de um cartão, só o que não está tampado)
+  const viu=new Set(cols.filter(c=>abertoC(c)||c.classList.contains('fica')));
+  const tam=new Map(velho?velho.tampas.map(t=>[t.parentElement,t.getBoundingClientRect().height]):[]);
+  const F=new Map(blocos.map(b=>[b,escondido(b,s,c=>viu.has(c))?null:b.getBoundingClientRect()]));
+  const op=new Map(cols.map(c=>[c,viu.has(c)?+getComputedStyle(c.firstElementChild).opacity:0]));
+  // 2. para o que estava andando e muda tudo de uma vez: onde cada parte vai ficar
+  acabar(s);mudar();
+  const rol=[...s.querySelectorAll('.in,.corpo')].map(c=>[c,c.scrollTop]);
+  const L=new Map(blocos.map(b=>[b,escondido(b,s,abertoC)?null:b.getBoundingClientRect()]));
+  // 3. o que fecha fica no lugar até o fim, e a janela continua rolada onde estava
+  const fica=cols.filter(c=>viu.has(c)&&!abertoC(c));fica.forEach(c=>c.classList.add('fica'));
+  rol.forEach(([c,y])=>{if(c.scrollTop!==y)c.scrollTop=y});
+  const U=new Map(blocos.map(b=>[b,b.getBoundingClientRect()]));
+  const pai=b=>{for(let p=b.parentElement;p&&p!==raiz;p=p.parentElement)if(U.has(p))return p;return raiz};
+  // quanto cada parte está deslocada (na tela) do lugar em que está agora, no começo e no fim; a escondida vai com a de fora
+  const de=new Map(), ate=new Map();
+  blocos.forEach(b=>{const u=U.get(b), p=b===raiz?null:pai(b);
+    de.set(b,F.get(b)?F.get(b).top-u.top:de.get(p));ate.set(b,L.get(b)?L.get(b).top-u.top:ate.get(p))});
+  const anims=[], ani=(el,k,o)=>{const a=el.animate(k,{duration:DUR,easing:CURVA,fill:'forwards',...o});anims.push(a);return a};
+  blocos.forEach(b=>{const p=b===raiz?null:pai(b), a=de.get(b)-(p?de.get(p):0), z=ate.get(b)-(p?ate.get(p):0);
+    if(Math.abs(a)<.5&&Math.abs(z)<.5)return;
+    // a janela usa translate (o transform dela é o de recuar quando outra abre por cima)
+    if(b===raiz)ani(b,[{translate:`0 ${a}px`},{translate:`0 ${z}px`}]);
+    else ani(b,[{transform:`translateY(${a}px)`},{transform:`translateY(${z}px)`}])});
+  // uma dobra dentro de outra que também muda vai junto com a de fora
+  const vaiJunto=c=>{const d=c.parentElement.closest('.collapse');return !!d&&s.contains(d)&&abertoC(d)!==viu.has(d)};
+  // no parcelado (.dobra), o que abre também aparece aos poucos e o que fecha se apaga, como antes
+  cols.forEach(c=>{if(!c.classList.contains('dobra')||vaiJunto(c))return;const ab=abertoC(c), o=op.get(c), i=c.firstElementChild;
+    if(ab&&o<1)ani(i,[{opacity:o},{opacity:1}],{easing:'ease-out'});
+    else if(!ab&&viu.has(c))ani(i,[{opacity:o},{opacity:0,offset:.7},{opacity:0}],{easing:'linear'})});
+  // a tampa: cobre, embaixo da parte, o quanto dela ainda não devia aparecer (no começo e no fim)
+  const tampas=[];
+  blocos.forEach(b=>{if(b===raiz||!b.matches(tampa)||!F.get(b)||!L.get(b)||b.classList.contains('collapse')&&vaiJunto(b))return;
+    const u=U.get(b).height, a=Math.max(0,u-(F.get(b).height-(tam.get(b)||0))), z=Math.max(0,u-L.get(b).height), h=Math.max(a,z);
+    if(h<.5)return;const t=document.createElement('i');t.className='tampa';t.style.height=h+'px';b.append(t);tampas.push(t);
+    ani(t,[{transform:`scaleY(${a/h})`},{transform:`scaleY(${z/h})`}])});
+  const f=s._flip={anims,tampas,fica};
+  if(depois)depois(L);
+  Promise.all(anims.map(a=>a.finished)).then(()=>{if(s._flip===f)acabar(s)},()=>{})}
+
 function rolar(c,y){if(!c)return;y=Math.round(Math.max(0,Math.min(y,c.scrollHeight-c.clientHeight)));
   if(Math.abs(y-c.scrollTop)<2)return;
   if(calmo()||!suave)c.scrollTop=y;else{c.scrollTo({top:y,behavior:'smooth'});rolandoAte=performance.now()+700}}
@@ -477,12 +558,13 @@ function gParc(){
   syncVence(d);
   // sem juros, o total é o valor que a pessoa pôs: a parcela arredonda o centavo, e isso não é juros
   const por=valorParcela(v), j=gTaxa(), tot=gVM==='total'&&!j?v:Math.round(por*gN*100)/100, juros=j?tot-v:0;
-  $('#gVMLbl').innerHTML=`O valor de <b>${fmt(v)}</b> é`;
-  $('#gParcRes').hidden=gPag!=='parc'||!v;
+  trocaHTML($('#gVMLbl'),`O valor de <b>${fmt(v)}</b> é`);
+  // fora do parcelado o resumo fica como estava (ele está fechando junto com o resto, e não muda no meio do caminho)
+  const rs=$('#gParcRes');if(gPag==='parc'&&rs.hidden!==!v)rs.hidden=!v;
   // curto: a parcela grande; embaixo o total e de que mês a que mês, com uma seta
-  $('#gParcRes').innerHTML=v?`<b>${gN}x de ${fmt(por)}</b>
+  if(gPag==='parc')trocaHTML(rs,v?`<b>${gN}x de ${fmt(por)}</b>
     <span class="pr-l"><span>Total <b>${fmt(tot)}</b></span><span class="pr-m">${mesCurto(i.y,i.m)}${SETA}<span class="so-leitor"> a </span>${mesCurto(f.getFullYear(),f.getMonth())}</span></span>
-    ${juros>0.004?`<small>${fmt(juros)} de juros</small>`:''}`:'';
+    ${juros>0.004?`<small>${fmt(juros)} de juros</small>`:''}`:'');
   depois()}
 // no lugar das simulações: enquanto digita, mostra quanto sobra no mês em que o gasto cai (num mês que passou, quanto sobrou nele).
 // O de todo mês mostra este mês, ou o mês em que começa, se for depois
@@ -553,7 +635,7 @@ function open(id,foco){const el=$(id),novo=!el.classList.contains('on');if(!pilh
   const junto=campo(alvo)&&prever(alvo);if(!junto)geo(el,true);
   // o que mudou dentro dela enquanto estava fechada (a área marcada, o jeito de pagar) já fica pronto, sem animar escondido,
   // e ela parte de onde está agora, embaixo da tela
-  if(novo){if(el.getAnimations)el.getAnimations({subtree:true}).forEach(x=>{if('transitionProperty' in x)try{x.finish()}catch(e){}});else getComputedStyle(el).visibility}
+  if(novo){acabar(el);if(el.getAnimations)el.getAnimations({subtree:true}).forEach(x=>{if('transitionProperty' in x)try{x.finish()}catch(e){}});else getComputedStyle(el).visibility}
   el.classList.add('on');arrumarPilha();historico();
   setTimeout(()=>alvo?.focus({preventScroll:true}),junto?120:350)}
 function fechar(el){const i=pilha.indexOf(el);if(i>=0)pilha.splice(i,1);el.classList.remove('on','atras');el.inert=false}
